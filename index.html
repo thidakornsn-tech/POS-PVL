@@ -1,0 +1,3168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Powerlife Inventory &mdash; Event POS System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          brand: { 50:'#eef7f4',100:'#d7ece3',200:'#aed9c8',300:'#7fc1a9',400:'#4fa585',500:'#2f8a6b',600:'#227058',600:'#227058',700:'#1c5a46',800:'#184839',900:'#153b2f' },
+        },
+        fontFamily: { sans: ['system-ui','-apple-system','Segoe UI','Roboto','Helvetica Neue','Arial','sans-serif'] }
+      }
+    }
+  }
+</script>
+<style>
+  html, body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background:#f6f7f8; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  table { border-collapse: separate; border-spacing: 0; }
+  .table-scroll { -webkit-overflow-scrolling: touch; }
+  .fade-in { animation: fadeIn .12s ease-out; }
+  @keyframes fadeIn { from { opacity:0; transform: translateY(2px);} to { opacity:1; transform:none; } }
+  .modal-pop { animation: popIn .14s cubic-bezier(.2,.8,.3,1); }
+  @keyframes popIn { from { opacity:0; transform: scale(.98) translateY(4px);} to { opacity:1; transform:none; } }
+  input[type="checkbox"] { accent-color: #227058; }
+</style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useRef, useCallback, Fragment } = React;
+
+/* =========================================================================
+   ICONS (hand-authored, feather-style, no external icon dependency)
+   ========================================================================= */
+const ICONS = {
+  search: "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm10 2-4.35-4.35",
+  plus: "M12 5v14M5 12h14",
+  x: "M18 6 6 18M6 6l12 12",
+  chevronDown: "m6 9 6 6 6-6",
+  chevronUp: "m18 15-6-6-6 6",
+  trash: "M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16ZM10 11v6M14 11v6",
+  edit: "M11 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5Z",
+  dots: "M5 12a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm7 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm7 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z",
+  copy: "M20 9H11a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2ZM5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1",
+  tag: "M12.59 2.59A2 2 0 0 0 11.17 2H4a2 2 0 0 0-2 2v7.17a2 2 0 0 0 .59 1.41l8.83 8.83a2 2 0 0 0 2.82 0l7.17-7.17a2 2 0 0 0 0-2.82l-8.82-8.83Z M7 7h.01",
+  calendar: "M8 2v4M16 2v4M3.5 9h17M4 5h16a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z",
+  box: "M21 8 12 3 3 8l9 5 9-5ZM3 8v9l9 5m0-14v14m9-14v9l-9 5",
+  alert: "M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0ZM12 9v4m0 4h.01",
+  upload: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12",
+  download: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3",
+  logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",
+  check: "M20 6 9 17l-5-5",
+  arrowUp: "M12 19V5M5 12l7-7 7 7",
+  arrowDown: "M12 5v14M19 12l-7 7-7-7",
+  filter: "M22 3H2l8 9.46V19l4 2v-8.54L22 3Z",
+  lock: "M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2ZM7 11V7a5 5 0 0 1 10 0v4",
+  user: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z",
+  refresh: "M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16m0 5v-5h5",
+  package: "m16.5 9.4-9-5.19M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16ZM3.27 6.96 12 12.01l8.73-5.05M12 22.08V12",
+  info: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM12 16v-4M12 8h.01",
+};
+function Icon({ name, className = "w-4 h-4", strokeWidth = 2 }) {
+  const d = ICONS[name] || "";
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <path d={d} />
+    </svg>
+  );
+}
+
+/* =========================================================================
+   UTILITIES
+   ========================================================================= */
+function genId(prefix = "id") {
+  return prefix + "_" + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
+}
+function formatCurrency(n) {
+  if (n === null || n === undefined || n === "" || isNaN(n)) return "—";
+  return "฿" + Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+function formatDateTime(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+function formatDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+function classNames(...a) { return a.filter(Boolean).join(" "); }
+
+function allocatedEventStock(p) {
+  return (p.eventAllocations || []).reduce((sum, ea) => sum + Math.max(0, ea.allocated - ea.returned), 0);
+}
+function availableStock(p) {
+  return (p.currentStock || 0) - allocatedEventStock(p);
+}
+function activePromotion(p) {
+  if (!p.activePromotionId) return null;
+  const promo = (p.promotions || []).find(pr => pr.id === p.activePromotionId);
+  return promo && promo.active ? promo : null;
+}
+
+/* -------- fuzzy header matching for smart import -------- */
+const FIELD_LABELS = {
+  brand: "Brand",
+  name: "Product Name",
+  barcode: "Barcode",
+  sku: "Product Code / SKU",
+  rrpPrice: "RRP Price",
+  currentStock: "Current Stock",
+};
+const FIELD_SYNONYMS = {
+  brand: ["brand", "brands", "product brand", "vendor", "manufacturer", "make", "supplier", "maker", "brand name"],
+  name: ["product name", "name", "item", "item name", "description", "product", "item description", "title", "product title", "product description"],
+  barcode: ["barcode", "bar code", "ean", "ean13", "ean 13", "upc", "gtin", "scan code"],
+  sku: ["sku", "product code", "item code", "model", "code", "product sku", "part number", "part no", "productcode", "itemcode", "item no", "model number"],
+  rrpPrice: ["price", "retail", "retail price", "rrp", "msrp", "selling price", "unit price", "list price", "sale price", "sell price", "cost price", "unit retail"],
+  currentStock: ["stock", "qty", "quantity", "inventory", "on hand", "onhand", "on-hand", "available", "stock qty", "stock quantity", "units", "in stock", "current stock", "quantity on hand"],
+};
+function normalizeHeader(h) {
+  return String(h || "").toLowerCase().trim().replace(/[_\-\.\/]+/g, " ").replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+}
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  if (m === 0) return n; if (n === 0) return m;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+    }
+  }
+  return dp[m][n];
+}
+function similarity(a, b) {
+  const dist = levenshtein(a, b);
+  const maxLen = Math.max(a.length, b.length, 1);
+  return 1 - dist / maxLen;
+}
+function guessFieldForHeader(header) {
+  const norm = normalizeHeader(header);
+  if (!norm) return { field: null, confidence: 0 };
+  let best = { field: null, confidence: 0 };
+  for (const [field, syns] of Object.entries(FIELD_SYNONYMS)) {
+    for (const syn of syns) {
+      if (norm === syn) return { field, confidence: 1 };
+      // Only match when the (longer) header contains the full synonym phrase —
+      // NOT the reverse. Matching "syn.includes(norm)" would let a short,
+      // generic header like "Unit" false-positive against a longer synonym
+      // like "unit price" purely because "unit" is a substring of it.
+      if (norm.includes(syn) && syn.length >= 3) {
+        if (0.9 > best.confidence) best = { field, confidence: 0.9 };
+      } else {
+        const sim = similarity(norm, syn);
+        if (sim > 0.72 && sim > best.confidence) best = { field, confidence: sim * 0.8 };
+      }
+    }
+  }
+  return best;
+}
+function autoMapHeaders(headers) {
+  const guesses = headers.map(h => ({ header: h, ...guessFieldForHeader(h), normLen: normalizeHeader(h).length }));
+  const byField = {};
+  guesses.forEach(g => {
+    if (!g.field) return;
+    const existing = byField[g.field];
+    // On a confidence tie (e.g. a generic "Item" column vs. a specific "Product Name"
+    // column both matching exactly), prefer the more descriptive/longer header.
+    if (!existing || g.confidence > existing.confidence || (g.confidence === existing.confidence && g.normLen > existing.normLen)) {
+      if (existing) existing.field = null;
+      byField[g.field] = g;
+    } else {
+      g.field = null;
+    }
+  });
+  return guesses.map(g => ({ header: g.header, field: g.field }));
+}
+
+/* -------- Header-row auto-detection --------
+   Real-world spreadsheets often have a title/letterhead block (company name,
+   report date, etc.) above the real column headers. Scan the first ~20 rows
+   and pick the one that looks most like a header row (most cells matching a
+   known field), instead of blindly assuming row 1 is the header. */
+function findHeaderRowIndex(rows) {
+  const maxScan = Math.min(20, rows.length);
+  let best = { index: -1, score: -1, hasName: false };
+  for (let i = 0; i < maxScan; i++) {
+    const row = rows[i] || [];
+    if (row.every(c => String(c == null ? "" : c).trim() === "")) continue;
+    let score = 0, hasName = false, matchedCount = 0;
+    row.forEach(cell => {
+      const g = guessFieldForHeader(cell);
+      if (g.field) { score += g.confidence; matchedCount++; if (g.field === "name") hasName = true; }
+    });
+    const qualifies = matchedCount >= 2 || (matchedCount >= 1 && hasName);
+    if (qualifies && (score > best.score || (score === best.score && hasName && !best.hasName))) {
+      best = { index: i, score, hasName };
+    }
+  }
+  return best.index >= 0 ? best.index : 0; // fall back to row 1 if nothing scores
+}
+// Convert raw array-of-arrays rows into { headers, rows } objects, using the
+// auto-detected header row and skipping fully-blank rows (letterhead gaps,
+// trailing blank rows, etc.).
+function rowsToObjects(rawRows) {
+  const headerRowIdx = findHeaderRowIndex(rawRows);
+  const headerRow = rawRows[headerRowIdx] || [];
+  const seen = {};
+  const cols = [];
+  headerRow.forEach((h, idx) => {
+    let label = String(h == null ? "" : h).trim();
+    if (!label) return;
+    if (seen[label] != null) { seen[label]++; label = `${label} (${seen[label]})`; } else seen[label] = 1;
+    cols.push({ idx, label });
+  });
+  const dataRows = [];
+  for (let r = headerRowIdx + 1; r < rawRows.length; r++) {
+    const row = rawRows[r];
+    if (!row || row.every(c => String(c == null ? "" : c).trim() === "")) continue;
+    const obj = {};
+    cols.forEach(c => { obj[c.label] = row[c.idx]; });
+    dataRows.push(obj);
+  }
+  return { headers: cols.map(c => c.label), rows: dataRows, headerRowIdx };
+}
+function parseNumberLoose(v) {
+  if (v === null || v === undefined) return null;
+  if (typeof v === "number") return isNaN(v) ? null : v;
+  const cleaned = String(v).replace(/[^0-9.\-]/g, "");
+  if (cleaned === "" || cleaned === "-") return null;
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? null : n;
+}
+
+/* =========================================================================
+   SEED DATA
+   ========================================================================= */
+const DEMO_USERS = [
+  { username: "pvl", password: "Goodluck2026", name: "PVL", role: "Administrator" },
+  { username: "admin", password: "admin123", name: "Alex Morgan", role: "Administrator" },
+  { username: "manager", password: "manager123", name: "Sarah Chen", role: "Inventory Manager" },
+];
+const BRANDS = ["Nike", "Adidas", "Puma", "Under Armour", "New Balance", "Asics", "Reebok", "Mizuno", "Umbro", "Diadora", "Kappa", "Warrior"];
+const TYPES = ["Sock", "Jersey", "Shorts", "Cleats", "Match Ball", "Training Ball", "Goalkeeper Gloves", "Track Jacket", "Backpack", "Cap", "Water Bottle", "Shin Guards", "Sports Bag", "Compression Tights", "Running Shoes"];
+const ADJ = ["Pro", "Classic", "Superlight", "Grip", "Performance", "Training", "Match", "Speed", "Flex", "Ultra", "Ignite", "Vapor", "Prime"];
+const EVENT_NAMES = ["Bangkok Marathon 2026", "Football Expo Central World", "Summer Sports Fest", "Chiang Mai Run Series", "VIP Members Night", "Phuket Beach Cup"];
+const PROMO_NAMES = ["Summer Sale", "Football Expo", "Member Price", "Flash Sale", "VIP Price", "Clearance", "Weekend Deal"];
+
+function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+function pick(arr) { return arr[randInt(0, arr.length - 1)]; }
+
+function buildProduct({ brand, name, barcode, sku, rrpPrice, currentStock }) {
+  return {
+    id: genId("p"),
+    brand: brand || "",
+    name,
+    barcode: barcode || "",
+    sku: sku || "",
+    rrpPrice: rrpPrice ?? null,
+    currentStock: currentStock ?? 0,
+    promotions: [],
+    activePromotionId: null,
+    eventAllocations: [],
+    stockHistory: [{ id: genId("h"), date: new Date(Date.now() - randInt(1, 60) * 86400000).toISOString(), user: "System Import", action: "Import", qty: currentStock ?? 0, remark: "Initial stock from import", resultingStock: currentStock ?? 0 }],
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function generateSeedEvents() {
+  return EVENT_NAMES.map((n, i) => ({
+    id: genId("ev"),
+    name: n,
+    date: new Date(Date.now() + randInt(-10, 60) * 86400000).toISOString(),
+    location: pick(["Bangkok", "Chiang Mai", "Phuket", "Pattaya", "Khon Kaen", "Hat Yai"]),
+  }));
+}
+
+function generateSeedProducts(events, count = 3000) {
+  const products = [];
+
+  // guaranteed demo items referenced in spec examples
+  const guaranteed = [
+    { brand: "Warrior", name: "Grip Sock", sku: "WAR-GS-001", barcode: "8850001112223", rrpPrice: 390, currentStock: 120 },
+    { brand: "Nike", name: "Superlight Sock", sku: "NKE-SLS-014", barcode: "8850001112224", rrpPrice: 290, currentStock: 60 },
+    { brand: "Adidas", name: "Classic Sock", sku: "ADI-CLS-022", barcode: "8850001112225", rrpPrice: 250, currentStock: 8 },
+    { brand: "Puma", name: "Elite X", sku: "PUM-ELX-101", barcode: "8850001112226", rrpPrice: 3290, currentStock: 15 },
+    { brand: "Puma", name: "Elite Pro", sku: "PUM-ELP-102", barcode: "8850001112227", rrpPrice: 3690, currentStock: 0 },
+  ];
+  guaranteed.forEach(g => products.push(buildProduct(g)));
+
+  for (let i = 0; i < count - guaranteed.length; i++) {
+    const brand = pick(BRANDS);
+    const type = pick(TYPES);
+    const adj = pick(ADJ);
+    const name = Math.random() > 0.5 ? `${adj} ${type}` : `${type} ${adj}`;
+    const sku = `${brand.slice(0, 3).toUpperCase()}-${type.slice(0, 2).toUpperCase()}${randInt(100, 999)}`;
+    const barcode = "88" + String(randInt(1000000000, 9999999999));
+    const rrpPrice = Math.random() > 0.03 ? randInt(150, 5990) : null;
+    const stockRoll = Math.random();
+    const currentStock = stockRoll < 0.08 ? 0 : stockRoll < 0.2 ? randInt(1, 9) : randInt(10, 800);
+    products.push(buildProduct({ brand, name, sku, barcode, rrpPrice, currentStock }));
+  }
+
+  // sprinkle promotions/allocations only on the randomly-generated tail, keeping the
+  // guaranteed demo items (Grip Sock, Elite X, Elite Pro, ...) predictable for demos.
+  const randomTail = products.slice(guaranteed.length);
+
+  // sprinkle promotions on ~22% of products
+  randomTail.forEach(p => {
+    if (Math.random() < 0.22 && p.rrpPrice) {
+      const n = randInt(1, 3);
+      const used = new Set();
+      for (let k = 0; k < n; k++) {
+        let pname = pick(PROMO_NAMES);
+        let tries = 0;
+        while (used.has(pname) && tries < 5) { pname = pick(PROMO_NAMES); tries++; }
+        used.add(pname);
+        const discount = randInt(5, 30) / 100;
+        const price = Math.max(10, Math.round(p.rrpPrice * (1 - discount)));
+        p.promotions.push({ id: genId("promo"), name: pname, price, active: k === 0, createdAt: new Date().toISOString() });
+      }
+      const enabled = p.promotions.find(pr => pr.active);
+      if (enabled) p.activePromotionId = enabled.id;
+    }
+  });
+
+  // allocate some stock to events on ~15% of products
+  randomTail.forEach(p => {
+    if (Math.random() < 0.15 && p.currentStock > 5) {
+      const numEvents = randInt(1, 2);
+      const chosenEvents = [...events].sort(() => Math.random() - 0.5).slice(0, numEvents);
+      chosenEvents.forEach(ev => {
+        const allocated = Math.min(p.currentStock, randInt(1, Math.max(1, Math.floor(p.currentStock * 0.4))));
+        const returned = Math.random() < 0.3 ? randInt(0, allocated) : 0;
+        p.eventAllocations.push({ id: genId("ea"), eventId: ev.id, eventName: ev.name, allocated, returned });
+      });
+    }
+  });
+
+  return products;
+}
+
+/* -------- Sales people, payment methods, orders (POS + Dashboard) -------- */
+const SALES_PEOPLE_SEED = [
+  { name: "Nattapong Srisuwan", position: "Store Manager" },
+  { name: "Suchada Phromwong", position: "Sales Associate" },
+  { name: "James Wilson", position: "Event Staff" },
+  { name: "Ploy Sirisuk", position: "Cashier" },
+  { name: "Kevin Tran", position: "Sales Associate" },
+  { name: "Mai Thongdee", position: "Team Lead" },
+  { name: "Anan Charoenrat", position: "Event Staff" },
+  { name: "Lisa Park", position: "Sales Associate" },
+];
+function generateSeedSalesPeople() {
+  return SALES_PEOPLE_SEED.map(s => ({ id: genId("sp"), ...s }));
+}
+
+const DEFAULT_PAYMENT_METHOD_NAMES = ["Cash", "QR Payment", "Credit Card", "Bank Transfer", "PromptPay", "Other"];
+function generateSeedPaymentMethods() {
+  return DEFAULT_PAYMENT_METHOD_NAMES.map(name => ({ id: genId("pm"), name, builtIn: true }));
+}
+
+function pad(n, len) { return String(n).padStart(len, "0"); }
+function orderDateCode(d) {
+  return String(d.getFullYear()).slice(2) + pad(d.getMonth() + 1, 2) + pad(d.getDate(), 2);
+}
+function nextOrderNumber(existingOrders, forDate) {
+  const dateCode = orderDateCode(forDate);
+  const seq = existingOrders.filter(o => o.orderNumber.startsWith("EV" + dateCode)).length + 1;
+  return `EV${dateCode}-${pad(seq, 4)}`;
+}
+
+// Historical demo orders so Dashboard has something meaningful to chart out of the box.
+function generateSeedOrders(products, events, salesPeople, paymentMethods, daysBack = 45) {
+  const sellable = products.filter(p => p.rrpPrice);
+  if (!sellable.length || !events.length || !salesPeople.length) return [];
+  const orders = [];
+  const seqByDate = {};
+  const now = new Date();
+  for (let d = daysBack; d >= 0; d--) {
+    const day = new Date(now);
+    day.setDate(day.getDate() - d);
+    const numOrders = d === 0 ? randInt(2, 8) : randInt(3, 14);
+    for (let i = 0; i < numOrders; i++) {
+      const ev = pick(events);
+      const sp = pick(salesPeople);
+      const pm = pick(paymentMethods);
+      const hour = randInt(9, 20), minute = randInt(0, 59), second = randInt(0, 59);
+      const createdAt = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hour, minute, second).toISOString();
+      const numItems = randInt(1, 4);
+      const items = [];
+      const chosen = new Set();
+      for (let k = 0; k < numItems; k++) {
+        const prod = pick(sellable);
+        if (chosen.has(prod.id)) continue;
+        chosen.add(prod.id);
+        const qty = randInt(1, 3);
+        const isGiveaway = Math.random() < 0.06;
+        let unitPrice = prod.rrpPrice, priceLabel = "RRP";
+        const enabledPromos = (prod.promotions || []).filter(pr => pr.active);
+        if (!isGiveaway && enabledPromos.length && Math.random() < 0.35) {
+          const promo = pick(enabledPromos);
+          unitPrice = promo.price; priceLabel = promo.name;
+        }
+        if (isGiveaway) unitPrice = 0;
+        items.push({ productId: prod.id, name: prod.name, brand: prod.brand, sku: prod.sku, unitPrice, priceLabel, qty, isGiveaway, remark: "" });
+      }
+      if (!items.length) continue;
+      const subtotal = items.reduce((s, it) => s + (it.isGiveaway ? 0 : it.unitPrice * it.qty), 0);
+      const discount = Math.random() < 0.08 ? Math.round(subtotal * (randInt(3, 10) / 100)) : 0;
+      const total = Math.max(0, subtotal - discount);
+      const statusRoll = Math.random();
+      const status = statusRoll < 0.04 ? "refunded" : statusRoll < 0.06 ? "cancelled" : "completed";
+      const dateCode = orderDateCode(day);
+      seqByDate[dateCode] = (seqByDate[dateCode] || 0) + 1;
+      orders.push({
+        id: genId("ord"),
+        orderNumber: `EV${dateCode}-${pad(seqByDate[dateCode], 4)}`,
+        eventId: ev.id, eventName: ev.name,
+        salesPersonId: sp.id, salesPersonName: sp.name, salesPersonPosition: sp.position,
+        paymentMethodId: pm.id, paymentMethod: pm.name,
+        customerName: "", customerPhone: "", customerRemark: "",
+        items, subtotal, discount, total,
+        amountReceived: total, change: 0,
+        paymentStatus: status === "completed" ? "Paid" : status === "refunded" ? "Refunded" : "Cancelled",
+        status, isDraft: false,
+        createdAt,
+      });
+    }
+  }
+  return orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+/* =========================================================================
+   SMALL SHARED UI PRIMITIVES
+   ========================================================================= */
+function Button({ children, variant = "default", size = "md", className = "", ...props }) {
+  const base = "inline-flex items-center justify-center gap-1.5 font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed";
+  const sizes = { sm: "px-2.5 py-1.5 text-xs", md: "px-3.5 py-2 text-sm", lg: "px-4 py-2.5 text-sm" };
+  const variants = {
+    default: "bg-brand-700 text-white hover:bg-brand-800 focus:ring-brand-300",
+    outline: "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-gray-200",
+    ghost: "text-gray-600 hover:bg-gray-100 focus:ring-gray-200",
+    danger: "bg-red-600 text-white hover:bg-red-700 focus:ring-red-300",
+    subtle: "bg-brand-50 text-brand-800 hover:bg-brand-100 focus:ring-brand-200",
+  };
+  return <button className={classNames(base, sizes[size], variants[variant], className)} {...props}>{children}</button>;
+}
+function Badge({ children, color = "gray" }) {
+  const colors = {
+    gray: "bg-gray-100 text-gray-700",
+    green: "bg-green-50 text-green-700 border border-green-200",
+    red: "bg-red-50 text-red-700 border border-red-200",
+    amber: "bg-amber-50 text-amber-700 border border-amber-200",
+    blue: "bg-blue-50 text-blue-700 border border-blue-200",
+    brand: "bg-brand-50 text-brand-700 border border-brand-200",
+  };
+  return <span className={classNames("inline-flex items-center px-2 py-0.5 rounded text-xs font-medium", colors[color])}>{children}</span>;
+}
+function Modal({ open, onClose, title, children, width = "max-w-2xl", footer }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 fade-in" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className={classNames("modal-pop w-full bg-white rounded-lg shadow-xl border border-gray-200 flex flex-col max-h-[90vh]", width)}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 shrink-0">
+          <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600"><Icon name="x" /></button>
+        </div>
+        <div className="px-5 py-4 overflow-y-auto">{children}</div>
+        {footer && <div className="px-5 py-3 border-t border-gray-200 flex items-center justify-end gap-2 shrink-0">{footer}</div>}
+      </div>
+    </div>
+  );
+}
+function Field({ label, children, hint }) {
+  return (
+    <div className="mb-3">
+      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      {children}
+      {hint && <p className="text-[11px] text-gray-400 mt-1">{hint}</p>}
+    </div>
+  );
+}
+const inputCls = "w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-brand-400";
+
+function ConfirmDialog({ open, title, message, danger, confirmLabel = "Confirm", requireText, onConfirm, onCancel }) {
+  const [typed, setTyped] = useState("");
+  useEffect(() => { setTyped(""); }, [open]);
+  if (!open) return null;
+  const disabled = requireText ? typed.trim() !== requireText : false;
+  return (
+    <Modal open={open} onClose={onCancel} title={title} width="max-w-md"
+      footer={<>
+        <Button variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button variant={danger ? "danger" : "default"} disabled={disabled} onClick={onConfirm}>{confirmLabel}</Button>
+      </>}>
+      <div className="flex gap-3">
+        {danger && <div className="shrink-0 text-red-500"><Icon name="alert" className="w-6 h-6" /></div>}
+        <p className="text-sm text-gray-600 leading-relaxed">{message}</p>
+      </div>
+      {requireText && (
+        <div className="mt-4">
+          <label className="block text-xs font-medium text-gray-600 mb-1">Type <span className="font-mono font-semibold text-red-600">{requireText}</span> to confirm</label>
+          <input className={inputCls} value={typed} onChange={e => setTyped(e.target.value)} autoFocus />
+        </div>
+      )}
+    </Modal>
+  );
+}
+function Toast({ toasts }) {
+  return (
+    <div className="fixed bottom-4 right-4 z-[60] flex flex-col gap-2">
+      {toasts.map(t => (
+        <div key={t.id} className="fade-in bg-gray-900 text-white text-sm px-4 py-2.5 rounded-md shadow-lg flex items-center gap-2 min-w-[220px]">
+          <Icon name="check" className="w-4 h-4 text-green-400" />{t.message}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* =========================================================================
+   LOGIN SCREEN
+   ========================================================================= */
+function LoginScreen({ onLogin }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  function submit(e) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    setTimeout(() => {
+      const user = DEMO_USERS.find(u => u.username === username.trim().toLowerCase() && u.password === password);
+      if (user) { onLogin(user); }
+      else { setError("Invalid username or password."); }
+      setLoading(false);
+    }, 350);
+  }
+  function quickFill(u) { setUsername(u.username); setPassword(u.password); }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 px-4">
+      <div className="w-full max-w-sm">
+        <div className="flex items-center gap-2 justify-center mb-6">
+          <div className="w-9 h-9 rounded-md bg-brand-700 flex items-center justify-center text-white"><Icon name="box" className="w-5 h-5" /></div>
+          <div className="text-lg font-semibold tracking-tight text-gray-900">Powerlife Inventory</div>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+          <h1 className="text-base font-semibold text-gray-900 mb-1">Sign in</h1>
+          <p className="text-xs text-gray-500 mb-5">Event POS System &middot; Inventory Module</p>
+          <form onSubmit={submit}>
+            <Field label="Username">
+              <input className={inputCls} value={username} onChange={e => setUsername(e.target.value)} autoFocus placeholder="admin" />
+            </Field>
+            <Field label="Password">
+              <input type="password" className={inputCls} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
+            </Field>
+            {error && <p className="text-xs text-red-600 mb-3">{error}</p>}
+            <Button type="submit" className="w-full" size="lg" disabled={loading}>
+              {loading ? "Signing in…" : (<><Icon name="lock" className="w-4 h-4" />Sign in</>)}
+            </Button>
+          </form>
+          <div className="mt-5 pt-4 border-t border-gray-100">
+            <p className="text-[11px] text-gray-400 mb-2">Demo accounts (this is a prototype — no real backend):</p>
+            <div className="flex gap-2">
+              {DEMO_USERS.map(u => (
+                <button key={u.username} onClick={() => quickFill(u)} className="text-[11px] px-2 py-1 rounded border border-gray-200 hover:bg-gray-50 text-gray-600">
+                  {u.username} / {u.password}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <p className="text-center text-[11px] text-gray-400 mt-4">This is a client-side prototype. Data resets on reload — connect a real backend for persistent, multi-user auth.</p>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================================
+   PRODUCT FORM (Add / Edit)
+   ========================================================================= */
+function ProductForm({ initial, onSave, onCancel }) {
+  const [form, setForm] = useState(() => initial ? { ...initial } : { brand: "", name: "", barcode: "", sku: "", rrpPrice: "", currentStock: 0 });
+  const [error, setError] = useState("");
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
+  function submit() {
+    if (!form.name || !form.name.trim()) { setError("Product Name is required."); return; }
+    onSave({
+      ...form,
+      name: form.name.trim(),
+      rrpPrice: form.rrpPrice === "" || form.rrpPrice === null ? null : Number(form.rrpPrice),
+      currentStock: form.currentStock === "" || form.currentStock === null ? 0 : Number(form.currentStock),
+    });
+  }
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-x-4">
+        <Field label="Product Name *" hint="The only required field.">
+          <input className={inputCls} value={form.name} onChange={e => set("name", e.target.value)} autoFocus />
+        </Field>
+        <Field label="Brand">
+          <input className={inputCls} value={form.brand} onChange={e => set("brand", e.target.value)} />
+        </Field>
+        <Field label="Barcode">
+          <input className={inputCls} value={form.barcode} onChange={e => set("barcode", e.target.value)} />
+        </Field>
+        <Field label="Product Code / SKU">
+          <input className={inputCls} value={form.sku} onChange={e => set("sku", e.target.value)} />
+        </Field>
+        <Field label="RRP Price (THB)">
+          <input type="number" min="0" className={inputCls} value={form.rrpPrice ?? ""} onChange={e => set("rrpPrice", e.target.value)} />
+        </Field>
+        <Field label="Current Stock">
+          <input type="number" min="0" className={inputCls} value={form.currentStock ?? 0} onChange={e => set("currentStock", e.target.value)} />
+        </Field>
+      </div>
+      {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button onClick={submit}>{initial && initial.id ? "Save Changes" : "Create Product"}</Button>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================================
+   STOCK MODAL (adjust + history)
+   ========================================================================= */
+function StockModal({ product, onAdjust, onClose, currentUserName }) {
+  const [mode, setMode] = useState("increase");
+  const [qty, setQty] = useState("");
+  const [remark, setRemark] = useState("");
+  const [tab, setTab] = useState("adjust");
+  if (!product) return null;
+
+  function apply() {
+    const n = Number(qty);
+    if (!qty || isNaN(n) || n < 0) return;
+    let newStock = product.currentStock;
+    let action = "";
+    if (mode === "increase") { newStock += n; action = "Increase"; }
+    else if (mode === "decrease") { newStock = Math.max(0, newStock - n); action = "Decrease"; }
+    else if (mode === "set") { newStock = n; action = "Set"; }
+    onAdjust(product.id, { newStock, action, qty: n, remark: remark || "—", user: currentUserName });
+    setQty(""); setRemark("");
+  }
+
+  return (
+    <Modal open={!!product} onClose={onClose} title={`Stock — ${product.name}`} width="max-w-lg">
+      <div className="flex gap-1 mb-4 border-b border-gray-200">
+        {["adjust", "history"].map(t => (
+          <button key={t} onClick={() => setTab(t)} className={classNames("px-3 py-2 text-sm font-medium border-b-2 -mb-px capitalize", tab === t ? "border-brand-700 text-brand-800" : "border-transparent text-gray-500 hover:text-gray-700")}>
+            {t === "adjust" ? "Adjust Stock" : `History (${(product.stockHistory || []).length})`}
+          </button>
+        ))}
+      </div>
+      {tab === "adjust" ? (
+        <div>
+          <div className="flex items-center justify-between bg-gray-50 rounded-md px-3 py-2 mb-4 text-sm">
+            <span className="text-gray-500">Current stock</span>
+            <span className="font-semibold text-gray-900">{product.currentStock}</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            {[["increase", "Increase"], ["decrease", "Decrease"], ["set", "Set / Edit"]].map(([m, label]) => (
+              <button key={m} onClick={() => setMode(m)} className={classNames("px-2 py-2 rounded-md text-xs font-medium border", mode === m ? "bg-brand-700 border-brand-700 text-white" : "border-gray-300 text-gray-600 hover:bg-gray-50")}>{label}</button>
+            ))}
+          </div>
+          <Field label={mode === "set" ? "New stock quantity" : "Quantity"}>
+            <input type="number" min="0" className={inputCls} value={qty} onChange={e => setQty(e.target.value)} />
+          </Field>
+          <Field label="Remark">
+            <input className={inputCls} value={remark} onChange={e => setRemark(e.target.value)} placeholder="e.g. Supplier delivery, stock count correction…" />
+          </Field>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="outline" onClick={onClose}>Close</Button>
+            <Button onClick={apply}>Apply Adjustment</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="overflow-y-auto max-h-96">
+          <table className="w-full text-xs">
+            <thead className="text-gray-500 sticky top-0 bg-white"><tr className="text-left border-b border-gray-200">
+              <th className="py-1.5 pr-2">Date</th><th className="py-1.5 pr-2">User</th><th className="py-1.5 pr-2">Action</th><th className="py-1.5 pr-2">Qty</th><th className="py-1.5 pr-2">Result</th><th className="py-1.5">Remark</th>
+            </tr></thead>
+            <tbody>
+              {[...(product.stockHistory || [])].reverse().map(h => (
+                <tr key={h.id} className="border-b border-gray-100">
+                  <td className="py-1.5 pr-2 whitespace-nowrap text-gray-500">{formatDateTime(h.date)}</td>
+                  <td className="py-1.5 pr-2">{h.user}</td>
+                  <td className="py-1.5 pr-2"><Badge color={h.action === "Increase" || h.action === "Import" ? "green" : h.action === "Decrease" ? "red" : "blue"}>{h.action}</Badge></td>
+                  <td className="py-1.5 pr-2">{h.qty}</td>
+                  <td className="py-1.5 pr-2 font-medium">{h.resultingStock}</td>
+                  <td className="py-1.5 text-gray-500">{h.remark}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+/* =========================================================================
+   EVENT ALLOCATION MODAL
+   ========================================================================= */
+function EventModal({ product, events, onAllocate, onReturn, onMove, onClose }) {
+  const [action, setAction] = useState("allocate");
+  const [eventId, setEventId] = useState(events[0]?.id || "");
+  const [toEventId, setToEventId] = useState(events[1]?.id || events[0]?.id || "");
+  const [fromAllocId, setFromAllocId] = useState("");
+  const [qty, setQty] = useState("");
+
+  // Hooks must run on every render regardless of whether `product` is set yet
+  // (the modal is always mounted; `product` toggles null <-> object as it opens/closes).
+  useEffect(() => {
+    const allocs = product?.eventAllocations || [];
+    if (allocs.length && !fromAllocId) setFromAllocId(allocs[0].id);
+  }, [product]);
+
+  if (!product) return null;
+
+  const avail = availableStock(product);
+  const allocations = product.eventAllocations || [];
+
+  function submit() {
+    const n = Number(qty);
+    if (!qty || isNaN(n) || n <= 0) return;
+    if (action === "allocate") {
+      if (n > avail) return;
+      const ev = events.find(e => e.id === eventId);
+      onAllocate(product.id, { eventId, eventName: ev?.name || "", qty: n });
+    } else if (action === "return") {
+      const alloc = allocations.find(a => a.id === fromAllocId);
+      if (!alloc) return;
+      const remaining = alloc.allocated - alloc.returned;
+      if (n > remaining) return;
+      onReturn(product.id, { allocationId: fromAllocId, qty: n });
+    } else if (action === "move") {
+      const alloc = allocations.find(a => a.id === fromAllocId);
+      if (!alloc) return;
+      const remaining = alloc.allocated - alloc.returned;
+      if (n > remaining || toEventId === alloc.eventId) return;
+      const toEv = events.find(e => e.id === toEventId);
+      onMove(product.id, { fromAllocationId: fromAllocId, toEventId, toEventName: toEv?.name || "", qty: n });
+    }
+    setQty("");
+  }
+
+  return (
+    <Modal open={!!product} onClose={onClose} title={`Event Stock — ${product.name}`} width="max-w-2xl">
+      <div className="grid grid-cols-3 gap-2 mb-4 text-center">
+        <div className="bg-gray-50 rounded-md py-2"><div className="text-[11px] text-gray-500">Total Stock</div><div className="font-semibold">{product.currentStock}</div></div>
+        <div className="bg-amber-50 rounded-md py-2"><div className="text-[11px] text-amber-700">Allocated to Events</div><div className="font-semibold text-amber-800">{allocatedEventStock(product)}</div></div>
+        <div className="bg-green-50 rounded-md py-2"><div className="text-[11px] text-green-700">Available Warehouse</div><div className="font-semibold text-green-800">{avail}</div></div>
+      </div>
+
+      <div className="mb-4">
+        <div className="text-xs font-medium text-gray-600 mb-1.5">Per-event breakdown</div>
+        {allocations.length === 0 ? (
+          <p className="text-xs text-gray-400 italic">No allocations yet.</p>
+        ) : (
+          <table className="w-full text-xs mb-2">
+            <thead className="text-gray-500"><tr className="text-left border-b border-gray-200">
+              <th className="py-1">Event</th><th className="py-1">Allocated</th><th className="py-1">Returned</th><th className="py-1">Remaining</th>
+            </tr></thead>
+            <tbody>
+              {allocations.map(a => (
+                <tr key={a.id} className="border-b border-gray-100">
+                  <td className="py-1.5">{a.eventName}</td>
+                  <td className="py-1.5">{a.allocated}</td>
+                  <td className="py-1.5">{a.returned}</td>
+                  <td className="py-1.5 font-medium">{a.allocated - a.returned}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="border-t border-gray-200 pt-4">
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          {[["allocate", "Allocate to Event"], ["return", "Return from Event"], ["move", "Move Between Events"]].map(([m, label]) => (
+            <button key={m} onClick={() => setAction(m)} disabled={m !== "allocate" && allocations.length === 0}
+              className={classNames("px-2 py-2 rounded-md text-xs font-medium border disabled:opacity-40", action === m ? "bg-brand-700 border-brand-700 text-white" : "border-gray-300 text-gray-600 hover:bg-gray-50")}>{label}</button>
+          ))}
+        </div>
+
+        {action === "allocate" && (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Event"><select className={inputCls} value={eventId} onChange={e => setEventId(e.target.value)}>{events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}</select></Field>
+            <Field label={`Quantity (max ${avail})`}><input type="number" min="1" max={avail} className={inputCls} value={qty} onChange={e => setQty(e.target.value)} /></Field>
+          </div>
+        )}
+        {action === "return" && allocations.length > 0 && (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="From allocation"><select className={inputCls} value={fromAllocId} onChange={e => setFromAllocId(e.target.value)}>{allocations.map(a => <option key={a.id} value={a.id}>{a.eventName} (remaining {a.allocated - a.returned})</option>)}</select></Field>
+            <Field label="Quantity"><input type="number" min="1" className={inputCls} value={qty} onChange={e => setQty(e.target.value)} /></Field>
+          </div>
+        )}
+        {action === "move" && allocations.length > 0 && (
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="From"><select className={inputCls} value={fromAllocId} onChange={e => setFromAllocId(e.target.value)}>{allocations.map(a => <option key={a.id} value={a.id}>{a.eventName} (remaining {a.allocated - a.returned})</option>)}</select></Field>
+            <Field label="To event"><select className={inputCls} value={toEventId} onChange={e => setToEventId(e.target.value)}>{events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}</select></Field>
+            <Field label="Quantity"><input type="number" min="1" className={inputCls} value={qty} onChange={e => setQty(e.target.value)} /></Field>
+          </div>
+        )}
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" onClick={onClose}>Close</Button>
+          <Button onClick={submit}>Apply</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/* =========================================================================
+   PROMOTION MODAL
+   ========================================================================= */
+function PromotionModal({ product, onAdd, onUpdate, onDelete, onSetActive, onClose }) {
+  const [name, setName] = useState("");
+  const [price, setPrice] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  if (!product) return null;
+  const promos = product.promotions || [];
+
+  function submit() {
+    if (!name.trim() || !price) return;
+    if (editingId) { onUpdate(product.id, editingId, { name: name.trim(), price: Number(price) }); setEditingId(null); }
+    else { onAdd(product.id, { name: name.trim(), price: Number(price) }); }
+    setName(""); setPrice("");
+  }
+  function startEdit(p) { setEditingId(p.id); setName(p.name); setPrice(String(p.price)); }
+
+  return (
+    <Modal open={!!product} onClose={onClose} title={`Promotions — ${product.name}`} width="max-w-2xl">
+      <div className="mb-4 text-xs text-gray-500">RRP: <span className="font-medium text-gray-800">{formatCurrency(product.rrpPrice)}</span> &middot; Unlimited promotions supported. Only one may be active in POS at a time.</div>
+
+      <div className="border border-gray-200 rounded-md divide-y divide-gray-100 mb-4 max-h-64 overflow-y-auto">
+        {promos.length === 0 && <div className="p-4 text-xs text-gray-400 italic text-center">No promotions yet.</div>}
+        {promos.map(p => (
+          <div key={p.id} className="flex items-center justify-between px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <button title="Set active in POS" disabled={!p.active} onClick={() => onSetActive(product.id, product.activePromotionId === p.id ? null : p.id)}
+                className={classNames("w-4 h-4 rounded-full border flex items-center justify-center", product.activePromotionId === p.id && p.active ? "bg-brand-700 border-brand-700" : "border-gray-300")}>
+                {product.activePromotionId === p.id && p.active && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+              </button>
+              <div>
+                <div className="text-sm font-medium text-gray-900">{p.name}</div>
+                <div className="text-xs text-gray-500">{formatCurrency(p.price)} {product.activePromotionId === p.id && p.active && <span className="text-brand-700 font-medium ml-1">&middot; Active in POS</span>}</div>
+              </div>
+              <Badge color={p.active ? "green" : "gray"}>{p.active ? "Enabled" : "Disabled"}</Badge>
+            </div>
+            <div className="flex items-center gap-1">
+              <button onClick={() => onUpdate(product.id, p.id, { active: !p.active })} className="text-xs px-2 py-1 rounded border border-gray-200 hover:bg-gray-50 text-gray-600">{p.active ? "Disable" : "Enable"}</button>
+              <button onClick={() => startEdit(p)} className="p-1.5 rounded hover:bg-gray-100 text-gray-500"><Icon name="edit" className="w-3.5 h-3.5" /></button>
+              <button onClick={() => onDelete(product.id, p.id)} className="p-1.5 rounded hover:bg-red-50 text-red-500"><Icon name="trash" className="w-3.5 h-3.5" /></button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-gray-50 rounded-md p-3">
+        <div className="text-xs font-medium text-gray-600 mb-2">{editingId ? "Edit promotion" : "Add promotion"}</div>
+        <div className="grid grid-cols-[1fr_140px_auto] gap-2 items-end">
+          <Field label="Promotion Name"><input className={inputCls} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Summer Sale" /></Field>
+          <Field label="Price (THB)"><input type="number" min="0" className={inputCls} value={price} onChange={e => setPrice(e.target.value)} /></Field>
+          <Button onClick={submit} className="mb-3">{editingId ? "Save" : "Add"}</Button>
+        </div>
+        {editingId && <button className="text-xs text-gray-400 hover:text-gray-600" onClick={() => { setEditingId(null); setName(""); setPrice(""); }}>Cancel edit</button>}
+      </div>
+      <div className="flex justify-end pt-3"><Button variant="outline" onClick={onClose}>Close</Button></div>
+    </Modal>
+  );
+}
+
+/* =========================================================================
+   IMPORT MODAL (smart header mapping)
+   ========================================================================= */
+function ImportModal({ open, onClose, onImport }) {
+  const [step, setStep] = useState("upload"); // upload | mapping | result
+  const [fileName, setFileName] = useState("");
+  const [headers, setHeaders] = useState([]);
+  const [rows, setRows] = useState([]);
+  const [mapping, setMapping] = useState({}); // header -> field
+  const [result, setResult] = useState(null);
+  const [parsing, setParsing] = useState(false);
+  const [headerRowInfo, setHeaderRowInfo] = useState(0);
+  const fileRef = useRef(null);
+
+  function reset() { setStep("upload"); setFileName(""); setHeaders([]); setRows([]); setMapping({}); setResult(null); setHeaderRowInfo(0); }
+  function handleClose() { reset(); onClose(); }
+
+  function handleFile(file) {
+    if (!file) return;
+    setParsing(true);
+    setFileName(file.name);
+    const ext = file.name.split(".").pop().toLowerCase();
+    if (ext === "csv") {
+      // Parse as raw rows (no assumed header row) so we can auto-detect where
+      // the real header is — many exported reports have a title/letterhead
+      // block above the actual column headers.
+      Papa.parse(file, {
+        header: false, skipEmptyLines: false,
+        complete: (res) => {
+          const { headers, rows: dataRows, headerRowIdx } = rowsToObjects(res.data);
+          finishParse(headers, dataRows, headerRowIdx);
+        },
+        error: () => setParsing(false),
+      });
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const wb = XLSX.read(e.target.result, { type: "array" });
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const raw = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: true });
+          const { headers, rows: dataRows, headerRowIdx } = rowsToObjects(raw);
+          finishParse(headers, dataRows, headerRowIdx);
+        } catch (err) { setParsing(false); }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+  }
+  function finishParse(hdrs, data, headerRowIdx) {
+    const guessed = autoMapHeaders(hdrs);
+    const m = {};
+    guessed.forEach(g => { m[g.header] = g.field; });
+    setHeaders(hdrs);
+    setRows(data);
+    setMapping(m);
+    setHeaderRowInfo(headerRowIdx);
+    setParsing(false);
+    setStep("mapping");
+  }
+
+  function doImport() {
+    const nameHeader = Object.keys(mapping).find(h => mapping[h] === "name");
+    let imported = 0, skipped = 0;
+    const newProducts = [];
+    rows.forEach(row => {
+      const rec = { brand: "", name: "", barcode: "", sku: "", rrpPrice: null, currentStock: 0 };
+      Object.entries(mapping).forEach(([header, field]) => {
+        if (!field) return;
+        const val = row[header];
+        if (field === "rrpPrice") rec.rrpPrice = parseNumberLoose(val);
+        else if (field === "currentStock") rec.currentStock = parseNumberLoose(val) ?? 0;
+        else rec[field] = val !== undefined && val !== null ? String(val).trim() : "";
+      });
+      if (!rec.name || !rec.name.trim()) { skipped++; return; }
+      newProducts.push(buildProduct(rec));
+      imported++;
+    });
+    onImport(newProducts);
+    setResult({ imported, skipped, total: rows.length });
+    setStep("result");
+  }
+
+  const mappedFieldsUsed = Object.values(mapping).filter(Boolean);
+  const nameIsMapped = mappedFieldsUsed.includes("name");
+
+  return (
+    <Modal open={open} onClose={handleClose} title="Smart Import — Excel / CSV" width="max-w-3xl"
+      footer={step === "mapping" ? (<>
+        <Button variant="outline" onClick={() => setStep("upload")}>Back</Button>
+        <Button onClick={doImport} disabled={!nameIsMapped}>Import {rows.length} Rows</Button>
+      </>) : step === "result" ? (<Button onClick={handleClose}>Done</Button>) : null}>
+
+      {step === "upload" && (
+        <div>
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center hover:border-brand-400 transition-colors cursor-pointer"
+            onClick={() => fileRef.current?.click()}
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); }}>
+            <Icon name="upload" className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+            <p className="text-sm text-gray-600 font-medium">{parsing ? "Parsing file…" : "Click to upload or drag & drop"}</p>
+            <p className="text-xs text-gray-400 mt-1">.xlsx, .xls, or .csv — from any supplier, any column layout</p>
+            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e => handleFile(e.target.files[0])} />
+          </div>
+          <div className="mt-4 bg-blue-50 border border-blue-100 rounded-md p-3 text-xs text-blue-800 flex gap-2">
+            <Icon name="info" className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>No fixed template required. We automatically detect columns like "Vendor", "EAN", "MSRP", or "On Hand" and map them to the right fields. Only <strong>Product Name</strong> is required — everything else is optional and reviewable before import.</span>
+          </div>
+        </div>
+      )}
+
+      {step === "mapping" && (
+        <div>
+          <p className="text-xs text-gray-500 mb-1">File: <span className="font-medium text-gray-700">{fileName}</span> &middot; {rows.length} data row{rows.length !== 1 ? "s" : ""} detected. Review the suggested mapping below — unmatched columns are ignored automatically.</p>
+          {headerRowInfo > 0 && (
+            <p className="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-md px-2.5 py-1.5 mb-3 flex items-center gap-1.5">
+              <Icon name="info" className="w-3.5 h-3.5 shrink-0" />
+              Detected column headers on row {headerRowInfo + 1} of the sheet — the {headerRowInfo} row{headerRowInfo !== 1 ? "s" : ""} above it (title, company info, etc.) were skipped automatically.
+            </p>
+          )}
+          <table className="w-full text-xs border border-gray-200 rounded-md overflow-hidden">
+            <thead className="bg-gray-50 text-gray-500"><tr className="text-left">
+              <th className="px-3 py-2">Source Column</th><th className="px-3 py-2">Sample Value</th><th className="px-3 py-2">Maps To</th>
+            </tr></thead>
+            <tbody>
+              {headers.map(h => (
+                <tr key={h} className="border-t border-gray-100">
+                  <td className="px-3 py-2 font-medium text-gray-800">{h}</td>
+                  <td className="px-3 py-2 text-gray-500">{String(rows[0]?.[h] ?? "").slice(0, 30) || "—"}</td>
+                  <td className="px-3 py-2">
+                    <select className="text-xs border border-gray-300 rounded px-2 py-1 w-full" value={mapping[h] || ""} onChange={e => setMapping(m => ({ ...m, [h]: e.target.value || null }))}>
+                      <option value="">Ignore column</option>
+                      {Object.entries(FIELD_LABELS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!nameIsMapped && <p className="text-xs text-red-600 mt-3">Map at least one column to "Product Name" to continue.</p>}
+        </div>
+      )}
+
+      {step === "result" && result && (
+        <div className="text-center py-6">
+          <Icon name="check" className="w-10 h-10 mx-auto text-green-500 mb-3" />
+          <p className="text-sm text-gray-700">Imported <strong>{result.imported}</strong> of {result.total} rows.</p>
+          {result.skipped > 0 && <p className="text-xs text-amber-600 mt-1">{result.skipped} row(s) skipped — missing product name.</p>}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+/* =========================================================================
+   EXPORT MODAL
+   ========================================================================= */
+function ExportModal({ open, onClose, counts, onExport }) {
+  const [format, setFormat] = useState("xlsx");
+  const [scope, setScope] = useState("filtered");
+  if (!open) return null;
+  return (
+    <Modal open={open} onClose={onClose} title="Export Inventory" width="max-w-md"
+      footer={<><Button variant="outline" onClick={onClose}>Cancel</Button><Button onClick={() => onExport(format, scope)}>Export</Button></>}>
+      <Field label="Format">
+        <div className="grid grid-cols-3 gap-2">
+          {[["xlsx", "Excel"], ["csv", "CSV"], ["pdf", "PDF"]].map(([f, label]) => (
+            <button key={f} onClick={() => setFormat(f)} className={classNames("px-2 py-2 rounded-md text-xs font-medium border", format === f ? "bg-brand-700 border-brand-700 text-white" : "border-gray-300 text-gray-600 hover:bg-gray-50")}>{label}</button>
+          ))}
+        </div>
+      </Field>
+      <Field label="Scope">
+        <div className="space-y-1.5">
+          {[["current", `Current inventory (${counts.current})`], ["filtered", `Filtered / search results (${counts.filtered})`], ["selected", `Selected products (${counts.selected})`], ["all", `Entire inventory (${counts.all})`]].map(([s, label]) => (
+            <label key={s} className={classNames("flex items-center gap-2 text-sm border rounded-md px-3 py-2 cursor-pointer", scope === s ? "border-brand-400 bg-brand-50" : "border-gray-200", (s === "selected" && counts.selected === 0) && "opacity-40 pointer-events-none")}>
+              <input type="radio" name="scope" checked={scope === s} onChange={() => setScope(s)} />{label}
+            </label>
+          ))}
+        </div>
+      </Field>
+    </Modal>
+  );
+}
+
+/* =========================================================================
+   PRODUCT TABLE
+   ========================================================================= */
+const COLUMNS = [
+  { key: "brand", label: "Brand", sortable: true },
+  { key: "name", label: "Product Name", sortable: true },
+  { key: "barcode", label: "Barcode", sortable: false },
+  { key: "sku", label: "Product Code", sortable: false },
+  { key: "rrpPrice", label: "RRP Price", sortable: true },
+  { key: "promoPrice", label: "Promo Price", sortable: false },
+  { key: "currentStock", label: "Current Stock", sortable: true },
+  { key: "allocatedStock", label: "Allocated (Event)", sortable: false },
+  { key: "availableStock", label: "Available Stock", sortable: false },
+];
+
+function StockBadge({ product }) {
+  const avail = availableStock(product);
+  if (product.currentStock === 0) return <Badge color="red">Out of stock</Badge>;
+  if (product.currentStock <= 10) return <Badge color="amber">Low stock</Badge>;
+  return <Badge color="green">In stock</Badge>;
+}
+
+function RowMenu({ product, onEdit, onDuplicate, onDelete, onStock, onEvent, onPromo }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    function onDoc(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+  const items = [
+    { label: "Edit", icon: "edit", fn: onEdit },
+    { label: "Adjust Stock", icon: "box", fn: onStock },
+    { label: "Event Allocation", icon: "calendar", fn: onEvent },
+    { label: "Promotions", icon: "tag", fn: onPromo },
+    { label: "Duplicate", icon: "copy", fn: onDuplicate },
+    { label: "Delete", icon: "trash", fn: onDelete, danger: true },
+  ];
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen(o => !o)} className="p-1.5 rounded hover:bg-gray-100 text-gray-500"><Icon name="dots" /></button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-1 fade-in">
+          {items.map(it => (
+            <button key={it.label} onClick={() => { setOpen(false); it.fn(); }}
+              className={classNames("w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-gray-50 text-left", it.danger ? "text-red-600" : "text-gray-700")}>
+              <Icon name={it.icon} className="w-3.5 h-3.5" />{it.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =========================================================================
+   MAIN INVENTORY APP
+   ========================================================================= */
+const FILTERS = [
+  { key: "all", label: "All Products" },
+  { key: "inStock", label: "In Stock" },
+  { key: "outOfStock", label: "Out of Stock" },
+  { key: "lowStock", label: "Low Stock" },
+  { key: "withPromo", label: "With Promotion" },
+  { key: "withoutPromo", label: "Without Promotion" },
+  { key: "allocated", label: "Allocated to Event" },
+  { key: "notAllocated", label: "Not Allocated" },
+];
+
+function InventoryView({ currentUser, products, setProducts, events }) {
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("name");
+  const [sortDir, setSortDir] = useState("asc");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [selected, setSelected] = useState(() => new Set());
+
+  const [editingProduct, setEditingProduct] = useState(null); // null = closed, {} = new, obj = edit
+  const [showAddEdit, setShowAddEdit] = useState(false);
+  // Modals reference products by id (not a snapshot object) so they always show
+  // live data — e.g. adding a promotion or allocating stock updates the open modal instantly.
+  const [stockProductId, setStockProductId] = useState(null);
+  const [eventProductId, setEventProductId] = useState(null);
+  const [promoProductId, setPromoProductId] = useState(null);
+  const stockProduct = useMemo(() => products.find(p => p.id === stockProductId) || null, [products, stockProductId]);
+  const eventProduct = useMemo(() => products.find(p => p.id === eventProductId) || null, [products, eventProductId]);
+  const promoProduct = useMemo(() => products.find(p => p.id === promoProductId) || null, [products, promoProductId]);
+  const [showImport, setShowImport] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [confirm, setConfirm] = useState(null);
+  const [toasts, setToasts] = useState([]);
+
+  function pushToast(message) {
+    const id = genId("t");
+    setToasts(t => [...t, { id, message }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 2600);
+  }
+
+  /* ---------- derived data ---------- */
+  const filteredSorted = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let list = products;
+    if (q) {
+      list = list.filter(p =>
+        (p.name || "").toLowerCase().includes(q) ||
+        (p.brand || "").toLowerCase().includes(q) ||
+        (p.barcode || "").toLowerCase().includes(q) ||
+        (p.sku || "").toLowerCase().includes(q)
+      );
+    }
+    switch (filter) {
+      case "inStock": list = list.filter(p => p.currentStock > 10); break;
+      case "outOfStock": list = list.filter(p => p.currentStock === 0); break;
+      case "lowStock": list = list.filter(p => p.currentStock > 0 && p.currentStock <= 10); break;
+      case "withPromo": list = list.filter(p => !!activePromotion(p)); break;
+      case "withoutPromo": list = list.filter(p => !activePromotion(p)); break;
+      case "allocated": list = list.filter(p => allocatedEventStock(p) > 0); break;
+      case "notAllocated": list = list.filter(p => allocatedEventStock(p) === 0); break;
+      default: break;
+    }
+    const sorted = [...list].sort((a, b) => {
+      let av, bv;
+      if (sortBy === "rrpPrice") { av = a.rrpPrice ?? -1; bv = b.rrpPrice ?? -1; }
+      else if (sortBy === "currentStock") { av = a.currentStock; bv = b.currentStock; }
+      else { av = (a[sortBy] || "").toString().toLowerCase(); bv = (b[sortBy] || "").toString().toLowerCase(); }
+      if (av < bv) return sortDir === "asc" ? -1 : 1;
+      if (av > bv) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  }, [products, search, filter, sortBy, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredSorted.length / pageSize));
+  const pageClamped = Math.min(page, totalPages);
+  const paged = useMemo(() => filteredSorted.slice((pageClamped - 1) * pageSize, pageClamped * pageSize), [filteredSorted, pageClamped, pageSize]);
+
+  useEffect(() => { setPage(1); }, [search, filter, pageSize]);
+
+  const stats = useMemo(() => ({
+    total: products.length,
+    outOfStock: products.filter(p => p.currentStock === 0).length,
+    lowStock: products.filter(p => p.currentStock > 0 && p.currentStock <= 10).length,
+    withPromo: products.filter(p => !!activePromotion(p)).length,
+    availableTotal: products.reduce((s, p) => s + Math.max(0, availableStock(p)), 0),
+  }), [products]);
+
+  /* ---------- mutations ---------- */
+  function updateProduct(id, patch) { setProducts(ps => ps.map(p => p.id === id ? { ...p, ...patch } : p)); }
+
+  function saveProduct(data) {
+    if (editingProduct && editingProduct.id) {
+      updateProduct(editingProduct.id, data);
+      pushToast("Product updated");
+    } else {
+      const np = buildProduct(data);
+      np.stockHistory = [{ id: genId("h"), date: new Date().toISOString(), user: currentUser.name, action: "Set", qty: data.currentStock || 0, remark: "Product created", resultingStock: data.currentStock || 0 }];
+      setProducts(ps => [np, ...ps]);
+      pushToast("Product created");
+    }
+    setShowAddEdit(false); setEditingProduct(null);
+  }
+  function duplicateProduct(p) {
+    const copy = { ...p, id: genId("p"), name: p.name + " (Copy)", sku: p.sku ? p.sku + "-COPY" : "", barcode: "", createdAt: new Date().toISOString(), stockHistory: [{ id: genId("h"), date: new Date().toISOString(), user: currentUser.name, action: "Set", qty: p.currentStock, remark: "Duplicated from " + p.name, resultingStock: p.currentStock }] };
+    setProducts(ps => [copy, ...ps]);
+    pushToast("Product duplicated");
+  }
+  function deleteProduct(id) {
+    setProducts(ps => ps.filter(p => p.id !== id));
+    setSelected(s => { const n = new Set(s); n.delete(id); return n; });
+    pushToast("Product deleted");
+  }
+  function bulkDelete() {
+    setProducts(ps => ps.filter(p => !selected.has(p.id)));
+    pushToast(`${selected.size} products deleted`);
+    setSelected(new Set());
+  }
+  function deleteAll() {
+    setProducts([]);
+    setSelected(new Set());
+    pushToast("Entire inventory deleted");
+  }
+  function adjustStock(id, { newStock, action, qty, remark, user }) {
+    setProducts(ps => ps.map(p => {
+      if (p.id !== id) return p;
+      const hist = [...(p.stockHistory || []), { id: genId("h"), date: new Date().toISOString(), user, action, qty, remark, resultingStock: newStock }];
+      return { ...p, currentStock: newStock, stockHistory: hist };
+    }));
+    pushToast("Stock updated");
+  }
+  function allocateToEvent(id, { eventId, eventName, qty }) {
+    setProducts(ps => ps.map(p => {
+      if (p.id !== id) return p;
+      const existing = (p.eventAllocations || []).find(a => a.eventId === eventId);
+      let allocations;
+      if (existing) allocations = p.eventAllocations.map(a => a.id === existing.id ? { ...a, allocated: a.allocated + qty } : a);
+      else allocations = [...(p.eventAllocations || []), { id: genId("ea"), eventId, eventName, allocated: qty, returned: 0 }];
+      return { ...p, eventAllocations: allocations };
+    }));
+    pushToast("Stock allocated to event");
+  }
+  function returnFromEvent(id, { allocationId, qty }) {
+    setProducts(ps => ps.map(p => {
+      if (p.id !== id) return p;
+      const allocations = (p.eventAllocations || []).map(a => a.id === allocationId ? { ...a, returned: a.returned + qty } : a);
+      return { ...p, eventAllocations: allocations };
+    }));
+    pushToast("Stock returned from event");
+  }
+  function moveBetweenEvents(id, { fromAllocationId, toEventId, toEventName, qty }) {
+    setProducts(ps => ps.map(p => {
+      if (p.id !== id) return p;
+      let allocations = p.eventAllocations.map(a => a.id === fromAllocationId ? { ...a, returned: a.returned + qty } : a);
+      const existingTo = allocations.find(a => a.eventId === toEventId);
+      if (existingTo) allocations = allocations.map(a => a.id === existingTo.id ? { ...a, allocated: a.allocated + qty } : a);
+      else allocations = [...allocations, { id: genId("ea"), eventId: toEventId, eventName: toEventName, allocated: qty, returned: 0 }];
+      return { ...p, eventAllocations: allocations };
+    }));
+    pushToast("Stock moved between events");
+  }
+  function addPromotion(id, { name, price }) {
+    setProducts(ps => ps.map(p => p.id === id ? { ...p, promotions: [...p.promotions, { id: genId("promo"), name, price, active: true, createdAt: new Date().toISOString() }] } : p));
+    pushToast("Promotion added");
+  }
+  function updatePromotion(id, promoId, patch) {
+    setProducts(ps => ps.map(p => p.id === id ? { ...p, promotions: p.promotions.map(pr => pr.id === promoId ? { ...pr, ...patch } : pr) } : p));
+  }
+  function deletePromotion(id, promoId) {
+    setProducts(ps => ps.map(p => p.id === id ? { ...p, promotions: p.promotions.filter(pr => pr.id !== promoId), activePromotionId: p.activePromotionId === promoId ? null : p.activePromotionId } : p));
+    pushToast("Promotion deleted");
+  }
+  function setActivePromotion(id, promoId) {
+    setProducts(ps => ps.map(p => p.id === id ? { ...p, activePromotionId: promoId } : p));
+  }
+  function importProducts(newProducts) {
+    setProducts(ps => [...newProducts, ...ps]);
+    pushToast(`Imported ${newProducts.length} products`);
+  }
+
+  /* ---------- export ---------- */
+  function buildExportRows(list) {
+    return list.map(p => ({
+      Brand: p.brand || "", "Product Name": p.name, Barcode: p.barcode || "", "Product Code": p.sku || "",
+      "RRP Price": p.rrpPrice ?? "", "Promotion Price": activePromotion(p)?.price ?? "",
+      "Current Stock": p.currentStock, "Allocated Event Stock": allocatedEventStock(p), "Available Stock": availableStock(p),
+    }));
+  }
+  function doExport(format, scope) {
+    let list;
+    if (scope === "current") list = paged;
+    else if (scope === "filtered") list = filteredSorted;
+    else if (scope === "selected") list = products.filter(p => selected.has(p.id));
+    else list = products;
+    const rows = buildExportRows(list);
+    const stamp = new Date().toISOString().slice(0, 10);
+    if (format === "csv") {
+      const csv = Papa.unparse(rows);
+      const blob = new Blob([csv], { type: "text/csv" });
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `inventory-${stamp}.csv`; a.click();
+    } else if (format === "xlsx") {
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Inventory");
+      XLSX.writeFile(wb, `inventory-${stamp}.xlsx`);
+    } else if (format === "pdf") {
+      const doc = new window.jspdf.jsPDF({ orientation: "landscape" });
+      const head = rows.length ? [Object.keys(rows[0])] : [[]];
+      const body = rows.map(r => Object.values(r));
+      doc.autoTable({ head, body, styles: { fontSize: 7 }, headStyles: { fillColor: [34, 112, 88] } });
+      doc.save(`inventory-${stamp}.pdf`);
+    }
+    pushToast(`Exported ${rows.length} products (${format.toUpperCase()})`);
+    setShowExport(false);
+  }
+
+  /* ---------- selection helpers ---------- */
+  function toggleSelect(id) { setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
+  function togglePageSelectAll() {
+    const pageIds = paged.map(p => p.id);
+    const allSelected = pageIds.every(id => selected.has(id));
+    setSelected(s => {
+      const n = new Set(s);
+      if (allSelected) pageIds.forEach(id => n.delete(id));
+      else pageIds.forEach(id => n.add(id));
+      return n;
+    });
+  }
+  function sortToggle(key) {
+    if (sortBy === key) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortBy(key); setSortDir("asc"); }
+  }
+
+  const pageAllSelected = paged.length > 0 && paged.every(p => selected.has(p.id));
+
+  return (
+    <div>
+      <div className="px-6 py-5 max-w-[1600px] mx-auto">
+        {/* stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
+          {[
+            ["Total Products", stats.total, "gray"],
+            ["Available Stock (units)", stats.availableTotal.toLocaleString(), "brand"],
+            ["Low Stock", stats.lowStock, "amber"],
+            ["Out of Stock", stats.outOfStock, "red"],
+            ["With Active Promotion", stats.withPromo, "green"],
+          ].map(([label, val, color]) => (
+            <div key={label} className="bg-white border border-gray-200 rounded-lg p-3.5">
+              <div className="text-[11px] text-gray-500 mb-1">{label}</div>
+              <div className="text-lg font-semibold text-gray-900">{val}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* toolbar */}
+        <div className="bg-white border border-gray-200 rounded-lg p-3 mb-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[220px]">
+              <Icon name="search" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-brand-400"
+                placeholder="Search by name, brand, barcode, or SKU…" value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+            <select className="text-sm border border-gray-300 rounded-md px-2.5 py-2" value={filter} onChange={e => setFilter(e.target.value)}>
+              {FILTERS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+            </select>
+            <Button variant="outline" size="md" onClick={() => setShowImport(true)}><Icon name="upload" className="w-4 h-4" />Import</Button>
+            <Button variant="outline" size="md" onClick={() => setShowExport(true)}><Icon name="download" className="w-4 h-4" />Export</Button>
+            {selected.size > 0 && (
+              <Button variant="danger" size="md" onClick={() => setConfirm({ type: "bulk" })}><Icon name="trash" className="w-4 h-4" />Delete Selected ({selected.size})</Button>
+            )}
+            <Button size="md" onClick={() => { setEditingProduct(null); setShowAddEdit(true); }}><Icon name="plus" className="w-4 h-4" />Add Product</Button>
+          </div>
+          <div className="flex items-center justify-between mt-2 text-[11px] text-gray-400">
+            <span>{filteredSorted.length.toLocaleString()} of {products.length.toLocaleString()} products match</span>
+            <button onClick={() => setConfirm({ type: "all" })} className="text-red-500 hover:text-red-700 hover:underline">Delete Entire Inventory</button>
+          </div>
+        </div>
+
+        {/* table */}
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="overflow-x-auto table-scroll">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200 text-left text-[11px] uppercase tracking-wide text-gray-500">
+                  <th className="px-3 py-2.5 w-8"><input type="checkbox" checked={pageAllSelected} onChange={togglePageSelectAll} /></th>
+                  {COLUMNS.map(c => (
+                    <th key={c.key} className={classNames("px-3 py-2.5 whitespace-nowrap", c.sortable && "cursor-pointer select-none hover:text-gray-700")}
+                      onClick={() => c.sortable && sortToggle(c.key)}>
+                      <span className="inline-flex items-center gap-1">{c.label}{c.sortable && sortBy === c.key && <Icon name={sortDir === "asc" ? "arrowUp" : "arrowDown"} className="w-3 h-3" />}</span>
+                    </th>
+                  ))}
+                  <th className="px-3 py-2.5 text-right w-10">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paged.map(p => {
+                  const promo = activePromotion(p);
+                  return (
+                    <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="px-3 py-2"><input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} /></td>
+                      <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{p.brand || "—"}</td>
+                      <td className="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">
+                        {p.name}
+                        <div className="mt-0.5"><StockBadge product={p} /></div>
+                      </td>
+                      <td className="px-3 py-2 text-gray-500 font-mono text-xs whitespace-nowrap">{p.barcode || "—"}</td>
+                      <td className="px-3 py-2 text-gray-500 font-mono text-xs whitespace-nowrap">{p.sku || "—"}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{formatCurrency(p.rrpPrice)}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{promo ? <span className="text-brand-700 font-medium">{formatCurrency(promo.price)} <span className="text-gray-400 font-normal">({promo.name})</span></span> : "—"}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{p.currentStock}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{allocatedEventStock(p)}</td>
+                      <td className="px-3 py-2 whitespace-nowrap font-medium">{availableStock(p)}</td>
+                      <td className="px-3 py-2 text-right">
+                        <RowMenu product={p}
+                          onEdit={() => { setEditingProduct(p); setShowAddEdit(true); }}
+                          onDuplicate={() => duplicateProduct(p)}
+                          onDelete={() => setConfirm({ type: "single", id: p.id, name: p.name })}
+                          onStock={() => setStockProductId(p.id)}
+                          onEvent={() => setEventProductId(p.id)}
+                          onPromo={() => setPromoProductId(p.id)} />
+                      </td>
+                    </tr>
+                  );
+                })}
+                {paged.length === 0 && (
+                  <tr><td colSpan={11} className="px-3 py-16 text-center text-gray-400 text-sm">No products match your search or filters.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          {/* pagination */}
+          <div className="flex items-center justify-between px-3 py-2.5 border-t border-gray-200 text-xs text-gray-500">
+            <div className="flex items-center gap-2">
+              <span>Rows per page</span>
+              <select className="border border-gray-300 rounded px-1.5 py-1" value={pageSize} onChange={e => setPageSize(Number(e.target.value))}>
+                {[25, 50, 100, 200].map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span>Page {pageClamped} of {totalPages}</span>
+              <button disabled={pageClamped <= 1} onClick={() => setPage(p => Math.max(1, p - 1))} className="px-2 py-1 border border-gray-300 rounded disabled:opacity-40">Prev</button>
+              <button disabled={pageClamped >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} className="px-2 py-1 border border-gray-300 rounded disabled:opacity-40">Next</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* modals */}
+      <Modal open={showAddEdit} onClose={() => { setShowAddEdit(false); setEditingProduct(null); }} title={editingProduct && editingProduct.id ? "Edit Product" : "Add Product"} width="max-w-xl">
+        <ProductForm initial={editingProduct} onSave={saveProduct} onCancel={() => { setShowAddEdit(false); setEditingProduct(null); }} />
+      </Modal>
+      <StockModal product={stockProduct} onAdjust={adjustStock} onClose={() => setStockProductId(null)} currentUserName={currentUser.name} />
+      <EventModal product={eventProduct} events={events} onAllocate={allocateToEvent} onReturn={returnFromEvent} onMove={moveBetweenEvents} onClose={() => setEventProductId(null)} />
+      <PromotionModal product={promoProduct} onAdd={addPromotion} onUpdate={updatePromotion} onDelete={deletePromotion} onSetActive={setActivePromotion} onClose={() => setPromoProductId(null)} />
+      <ImportModal open={showImport} onClose={() => setShowImport(false)} onImport={importProducts} />
+      <ExportModal open={showExport} onClose={() => setShowExport(false)}
+        counts={{ current: paged.length, filtered: filteredSorted.length, selected: selected.size, all: products.length }}
+        onExport={doExport} />
+
+      <ConfirmDialog
+        open={!!confirm}
+        title={confirm?.type === "all" ? "Delete Entire Inventory" : confirm?.type === "bulk" ? "Delete Selected Products" : "Delete Product"}
+        danger
+        confirmLabel="Delete"
+        message={
+          confirm?.type === "all" ? `This will permanently delete all ${products.length.toLocaleString()} products in your inventory. This cannot be undone.`
+          : confirm?.type === "bulk" ? `This will permanently delete ${selected.size} selected products. This cannot be undone.`
+          : `This will permanently delete "${confirm?.name}". This cannot be undone.`
+        }
+        requireText={confirm?.type === "all" ? "DELETE" : undefined}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          if (confirm.type === "all") deleteAll();
+          else if (confirm.type === "bulk") bulkDelete();
+          else deleteProduct(confirm.id);
+          setConfirm(null);
+        }}
+      />
+
+      <Toast toasts={toasts} />
+    </div>
+  );
+}
+
+/* =========================================================================
+   ORDER HELPERS (shared by POS + Dashboard)
+   ========================================================================= */
+function isCountableOrder(o) { return !o.isDraft && o.status === "completed"; }
+function orderUnits(o, includeGiveaway = true) {
+  return (o.items || []).reduce((s, it) => s + (includeGiveaway || !it.isGiveaway ? it.qty : 0), 0);
+}
+function applyOrderStockDeduction(setProducts, items, meta) {
+  setProducts(ps => ps.map(p => {
+    const it = items.find(i => i.productId === p.id);
+    if (!it) return p;
+    const newStock = Math.max(0, p.currentStock - it.qty);
+    const hist = [...(p.stockHistory || []), { id: genId("h"), date: new Date().toISOString(), user: meta.user, action: it.isGiveaway ? "Giveaway" : "Sale", qty: it.qty, remark: `Order ${meta.orderNumber} — ${meta.eventName}`, resultingStock: newStock }];
+    return { ...p, currentStock: newStock, stockHistory: hist };
+  }));
+}
+function applyOrderStockRestock(setProducts, items, meta) {
+  setProducts(ps => ps.map(p => {
+    const it = items.find(i => i.productId === p.id);
+    if (!it) return p;
+    const newStock = p.currentStock + it.qty;
+    const hist = [...(p.stockHistory || []), { id: genId("h"), date: new Date().toISOString(), user: meta.user, action: "Refund", qty: it.qty, remark: `Refund of order ${meta.orderNumber}`, resultingStock: newStock }];
+    return { ...p, currentStock: newStock, stockHistory: hist };
+  }));
+}
+// When an already-completed order is edited (quantities changed / lines removed),
+// reconcile inventory to match the new line items in one pass: products that now
+// have MORE units sold get additional stock deducted, products with FEWER units
+// sold (or removed entirely) get the difference returned.
+function reconcileOrderItemStock(setProducts, oldItems, newItems, meta) {
+  const deltaMap = {};
+  (oldItems || []).forEach(it => { if (it.productId) deltaMap[it.productId] = (deltaMap[it.productId] || 0) - it.qty; });
+  (newItems || []).forEach(it => { if (it.productId) deltaMap[it.productId] = (deltaMap[it.productId] || 0) + it.qty; });
+  setProducts(ps => ps.map(p => {
+    const delta = deltaMap[p.id];
+    if (!delta) return p;
+    const newStock = Math.max(0, p.currentStock - delta);
+    const hist = [...(p.stockHistory || []), { id: genId("h"), date: new Date().toISOString(), user: meta.user, action: delta > 0 ? "Sale" : "Refund", qty: Math.abs(delta), remark: `Order ${meta.orderNumber} edited`, resultingStock: newStock }];
+    return { ...p, currentStock: newStock, stockHistory: hist };
+  }));
+}
+
+/* -------- Searchable dropdown (Event / Sales Person pickers) -------- */
+function SearchableSelect({ value, onChange, options, placeholder = "Search…", renderLabel, renderOption, className }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const ref = useRef(null);
+  useEffect(() => {
+    function onDoc(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+  const selected = options.find(o => o.id === value);
+  const filtered = q.trim() ? options.filter(o => (o.searchText || o.label).toLowerCase().includes(q.toLowerCase())) : options;
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" onClick={() => setOpen(o => !o)} className={classNames("w-full flex items-center justify-between px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:border-gray-400", className)}>
+        <span className="truncate text-left">{selected ? (renderLabel ? renderLabel(selected) : selected.label) : placeholder}</span>
+        <Icon name="chevronDown" className="w-4 h-4 text-gray-400 shrink-0" />
+      </button>
+      {open && (
+        <div className="absolute z-30 mt-1 w-full min-w-[240px] bg-white border border-gray-200 rounded-md shadow-lg fade-in">
+          <div className="p-2 border-b border-gray-100">
+            <input autoFocus className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded" placeholder={placeholder} value={q} onChange={e => setQ(e.target.value)} />
+          </div>
+          <div className="max-h-56 overflow-y-auto py-1">
+            {filtered.length === 0 && <div className="px-3 py-2 text-xs text-gray-400">No matches</div>}
+            {filtered.map(o => (
+              <button key={o.id} type="button" onClick={() => { onChange(o.id); setOpen(false); setQ(""); }}
+                className={classNames("w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50", o.id === value && "bg-brand-50 text-brand-800")}>
+                {renderOption ? renderOption(o) : o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* -------- POS product card (with inline price selector) -------- */
+function POSProductCard({ product, onAdd }) {
+  const promos = (product.promotions || []).filter(p => p.active);
+  const priceOptions = [{ key: "rrp", label: "RRP", price: product.rrpPrice }, ...promos.map(p => ({ key: p.id, label: p.name, price: p.price }))];
+  const [priceKey, setPriceKey] = useState("rrp");
+  const chosen = priceOptions.find(p => p.key === priceKey) || priceOptions[0];
+  const avail = availableStock(product);
+  const outOfStock = avail <= 0;
+  return (
+    <div className={classNames("border border-gray-200 rounded-lg p-3 bg-white flex flex-col gap-1.5", outOfStock && "opacity-60")}>
+      <div className="flex items-start justify-between gap-1">
+        <div className="min-w-0">
+          <div className="text-[10px] text-gray-400 truncate">{product.brand || "—"}</div>
+          <div className="text-sm font-medium text-gray-900 leading-snug">{product.name}</div>
+        </div>
+        {outOfStock ? <Badge color="red">Out</Badge> : avail <= 10 ? <Badge color="amber">Low</Badge> : <Badge color="green">In stock</Badge>}
+      </div>
+      <div className="text-[11px] text-gray-400 font-mono truncate">{product.sku || product.barcode || "—"}</div>
+      {priceOptions.length > 1 ? (
+        <select className="text-xs border border-gray-200 rounded px-1.5 py-1 mt-1" value={priceKey} onChange={e => setPriceKey(e.target.value)} onClick={e => e.stopPropagation()}>
+          {priceOptions.map(p => <option key={p.key} value={p.key}>{p.label} — {formatCurrency(p.price)}</option>)}
+        </select>
+      ) : (
+        <div className="text-sm font-semibold text-gray-900 mt-1">{formatCurrency(product.rrpPrice)}</div>
+      )}
+      <div className="flex items-center justify-between mt-1.5">
+        <span className="text-[11px] text-gray-400">Avail: {avail}</span>
+        <Button size="sm" disabled={outOfStock || !chosen || !chosen.price} onClick={() => onAdd(product, chosen)}><Icon name="plus" className="w-3.5 h-3.5" />Add</Button>
+      </div>
+    </div>
+  );
+}
+
+/* -------- Cart row -------- */
+function CartRow({ item, onInc, onDec, onRemove, onQtyChange }) {
+  const lineTotal = item.isGiveaway ? 0 : item.unitPrice * item.qty;
+  return (
+    <div className="flex items-center gap-2 py-2 border-b border-gray-100 last:border-0">
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium text-gray-900 truncate">
+          {item.name}{item.isGiveaway && <span className="ml-1.5 align-middle"><Badge color="blue">Giveaway</Badge></span>}
+        </div>
+        <div className="text-[11px] text-gray-400">{item.isGiveaway ? (item.remark || "No charge") : `${formatCurrency(item.unitPrice)} · ${item.priceLabel}`}</div>
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        <button onClick={onDec} className="w-6 h-6 rounded border border-gray-300 flex items-center justify-center text-gray-500 hover:bg-gray-50">−</button>
+        <input type="number" min="1" className="w-10 text-center text-xs border border-gray-200 rounded py-0.5" value={item.qty} onChange={e => onQtyChange(Math.max(1, Number(e.target.value) || 1))} />
+        <button onClick={onInc} className="w-6 h-6 rounded border border-gray-300 flex items-center justify-center text-gray-500 hover:bg-gray-50">+</button>
+      </div>
+      <div className="w-16 text-right text-sm font-medium shrink-0">{formatCurrency(lineTotal)}</div>
+      <button onClick={onRemove} className="p-1 text-gray-400 hover:text-red-500 shrink-0"><Icon name="x" className="w-3.5 h-3.5" /></button>
+    </div>
+  );
+}
+
+/* -------- Giveaway modal -------- */
+function GiveawayModal({ open, products, onClose, onAdd }) {
+  const [mode, setMode] = useState("inventory");
+  const [search, setSearch] = useState("");
+  const [qty, setQty] = useState(1);
+  const [remark, setRemark] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [customName, setCustomName] = useState("");
+  useEffect(() => { if (open) { setSearch(""); setQty(1); setRemark(""); setSelectedProduct(null); setCustomName(""); setMode("inventory"); } }, [open]);
+  if (!open) return null;
+  const q = search.trim().toLowerCase();
+  const results = q ? products.filter(p => availableStock(p) > 0 && ((p.name || "").toLowerCase().includes(q) || (p.brand || "").toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q) || (p.barcode || "").toLowerCase().includes(q))).slice(0, 20) : [];
+
+  function submit() {
+    if (mode === "inventory") {
+      if (!selectedProduct || qty < 1) return;
+      onAdd({ productId: selectedProduct.id, name: selectedProduct.name, brand: selectedProduct.brand, sku: selectedProduct.sku, unitPrice: 0, priceLabel: "Giveaway", qty, isGiveaway: true, remark });
+    } else {
+      if (!customName.trim() || qty < 1) return;
+      onAdd({ productId: null, name: customName.trim(), brand: "", sku: "", unitPrice: 0, priceLabel: "Giveaway (custom)", qty, isGiveaway: true, remark });
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Add Giveaway" width="max-w-lg"
+      footer={<><Button variant="outline" onClick={onClose}>Cancel</Button><Button onClick={submit}>Add Giveaway</Button></>}>
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        {[["inventory", "From Inventory"], ["custom", "Custom Item"]].map(([m, label]) => (
+          <button key={m} onClick={() => setMode(m)} className={classNames("px-2 py-2 rounded-md text-xs font-medium border", mode === m ? "bg-brand-700 border-brand-700 text-white" : "border-gray-300 text-gray-600 hover:bg-gray-50")}>{label}</button>
+        ))}
+      </div>
+      {mode === "inventory" ? (
+        <div>
+          <Field label="Search product">
+            <input className={inputCls} value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, brand, barcode, SKU…" />
+          </Field>
+          {selectedProduct ? (
+            <div className="flex items-center justify-between bg-brand-50 border border-brand-200 rounded-md px-3 py-2 text-sm mb-3">
+              <span>{selectedProduct.name}</span>
+              <button className="text-xs text-gray-500 hover:text-gray-700" onClick={() => setSelectedProduct(null)}>Change</button>
+            </div>
+          ) : (
+            <div className="border border-gray-200 rounded-md max-h-40 overflow-y-auto mb-3">
+              {results.map(p => (
+                <button key={p.id} onClick={() => setSelectedProduct(p)} className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 border-b border-gray-50 last:border-0">{p.name} <span className="text-gray-400 text-xs">· {availableStock(p)} avail</span></button>
+              ))}
+              {q && results.length === 0 && <div className="px-3 py-2 text-xs text-gray-400">No matches</div>}
+            </div>
+          )}
+        </div>
+      ) : (
+        <Field label="Item name"><input className={inputCls} value={customName} onChange={e => setCustomName(e.target.value)} placeholder="e.g. Branded Keychain" /></Field>
+      )}
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Quantity"><input type="number" min="1" className={inputCls} value={qty} onChange={e => setQty(Math.max(1, Number(e.target.value) || 1))} /></Field>
+        <Field label="Remark"><input className={inputCls} value={remark} onChange={e => setRemark(e.target.value)} placeholder="Optional" /></Field>
+      </div>
+    </Modal>
+  );
+}
+
+/* -------- Order detail / receipt modal -------- */
+function OrderDetailModal({ order, onClose, onRefund, onCancelDraft, onDuplicate, onEdit, onDelete, readOnly = false, allowDuplicate = true }) {
+  if (!order) return null;
+  const editable = !readOnly && (order.status === "completed" || order.isDraft);
+  return (
+    <Modal open={!!order} onClose={onClose} title={`Order ${order.orderNumber}`} width="max-w-lg"
+      footer={<>
+        <Button variant="outline" onClick={() => window.print()}><Icon name="download" className="w-4 h-4" />Print Receipt</Button>
+        {!readOnly && allowDuplicate && <Button variant="outline" onClick={() => onDuplicate(order)}>Duplicate</Button>}
+        {editable && <Button variant="outline" onClick={() => onEdit(order)}><Icon name="edit" className="w-3.5 h-3.5" />Edit</Button>}
+        {!readOnly && order.status === "completed" && <Button variant="danger" onClick={() => onRefund(order.id)}>Refund</Button>}
+        {!readOnly && order.isDraft && <Button variant="danger" onClick={() => onCancelDraft(order.id)}>Cancel Draft</Button>}
+        {!readOnly && <Button variant="danger" onClick={() => onDelete(order)}><Icon name="trash" className="w-3.5 h-3.5" />Delete</Button>}
+        <Button onClick={onClose}>Close</Button>
+      </>}>
+      <div className="text-sm">
+        <div className="flex justify-between text-xs text-gray-500 mb-2">
+          <span>{formatDateTime(order.createdAt)}</span>
+          <Badge color={order.status === "completed" ? "green" : order.status === "refunded" ? "amber" : order.status === "draft" ? "blue" : "red"}>{order.status}</Badge>
+        </div>
+        <div className="grid grid-cols-2 gap-y-1 text-xs text-gray-600 mb-3">
+          <div>Event</div><div className="text-right font-medium text-gray-900">{order.eventName}</div>
+          <div>Sales Person</div><div className="text-right font-medium text-gray-900">{order.salesPersonName}</div>
+          <div>Payment Method</div><div className="text-right font-medium text-gray-900">{order.paymentMethod}</div>
+          {order.customerName && (<><div>Customer</div><div className="text-right font-medium text-gray-900">{order.customerName}</div></>)}
+        </div>
+        <div className="border-t border-b border-gray-200 divide-y divide-gray-100 mb-3">
+          {order.items.map((it, i) => (
+            <div key={i} className="flex justify-between py-1.5 text-xs">
+              <span>{it.qty}× {it.name}{it.isGiveaway && <span className="text-blue-600"> (Giveaway)</span>}</span>
+              <span>{formatCurrency(it.isGiveaway ? 0 : it.unitPrice * it.qty)}</span>
+            </div>
+          ))}
+        </div>
+        <div className="space-y-1 text-xs">
+          <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span>{formatCurrency(order.subtotal)}</span></div>
+          <div className="flex justify-between"><span className="text-gray-500">Discount</span><span>-{formatCurrency(order.discount)}</span></div>
+          <div className="flex justify-between text-sm font-semibold pt-1 border-t border-gray-200 mt-1"><span>Total</span><span>{formatCurrency(order.total)}</span></div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/* -------- Edit order modal (fields + line items, with stock reconciliation
+   handled by the caller via reconcileOrderItemStock) -------- */
+function EditOrderModal({ order, events, salesPeople, paymentMethods, onSave, onClose }) {
+  const [form, setForm] = useState(null);
+  useEffect(() => {
+    if (order) {
+      setForm({
+        eventId: order.eventId, salesPersonId: order.salesPersonId, paymentMethodId: order.paymentMethodId,
+        customerName: order.customerName || "", customerPhone: order.customerPhone || "", customerRemark: order.customerRemark || "",
+        discount: order.discount || 0,
+        items: order.items.map(it => ({ ...it })),
+      });
+    } else {
+      setForm(null);
+    }
+  }, [order && order.id]);
+  if (!order || !form) return null;
+
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
+  function setItemQty(idx, qty) { setForm(f => ({ ...f, items: f.items.map((it, i) => i === idx ? { ...it, qty: Math.max(1, qty) } : it) })); }
+  function removeItem(idx) { setForm(f => ({ ...f, items: f.items.filter((_, i) => i !== idx) })); }
+
+  const subtotal = form.items.reduce((s, it) => s + (it.isGiveaway ? 0 : it.unitPrice * it.qty), 0);
+  const total = Math.max(0, subtotal - (Number(form.discount) || 0));
+
+  function submit() {
+    const ev = events.find(e => e.id === form.eventId);
+    const sp = salesPeople.find(s => s.id === form.salesPersonId);
+    const pm = paymentMethods.find(p => p.id === form.paymentMethodId);
+    onSave(order, {
+      eventId: form.eventId, eventName: ev ? ev.name : order.eventName,
+      salesPersonId: form.salesPersonId, salesPersonName: sp ? sp.name : order.salesPersonName, salesPersonPosition: sp ? sp.position : order.salesPersonPosition,
+      paymentMethodId: form.paymentMethodId, paymentMethod: pm ? pm.name : order.paymentMethod,
+      customerName: form.customerName, customerPhone: form.customerPhone, customerRemark: form.customerRemark,
+      items: form.items, subtotal, discount: Number(form.discount) || 0, total,
+    });
+  }
+
+  return (
+    <Modal open={!!order} onClose={onClose} title={`Edit Order — ${order.orderNumber}`} width="max-w-lg"
+      footer={<><Button variant="outline" onClick={onClose}>Cancel</Button><Button onClick={submit}>Save Changes</Button></>}>
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <Field label="Event"><select className={inputCls} value={form.eventId} onChange={e => set("eventId", e.target.value)}>{events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}</select></Field>
+        <Field label="Sales Person"><select className={inputCls} value={form.salesPersonId} onChange={e => set("salesPersonId", e.target.value)}>{salesPeople.map(sp => <option key={sp.id} value={sp.id}>{sp.name}</option>)}</select></Field>
+        <Field label="Payment Method"><select className={inputCls} value={form.paymentMethodId} onChange={e => set("paymentMethodId", e.target.value)}>{paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}</select></Field>
+        <Field label="Discount (THB)"><input type="number" min="0" className={inputCls} value={form.discount} onChange={e => set("discount", Math.max(0, Number(e.target.value) || 0))} /></Field>
+        <Field label="Customer Name"><input className={inputCls} value={form.customerName} onChange={e => set("customerName", e.target.value)} /></Field>
+        <Field label="Phone"><input className={inputCls} value={form.customerPhone} onChange={e => set("customerPhone", e.target.value)} /></Field>
+      </div>
+      <div className="text-xs font-medium text-gray-600 mb-1.5">Items</div>
+      <div className="border border-gray-200 rounded-md divide-y divide-gray-100 mb-3 max-h-56 overflow-y-auto">
+        {form.items.map((it, i) => (
+          <div key={i} className="flex items-center gap-2 px-3 py-2 text-sm">
+            <div className="flex-1 min-w-0 truncate">{it.name}{it.isGiveaway && <span className="ml-1.5 align-middle"><Badge color="blue">Giveaway</Badge></span>}</div>
+            <input type="number" min="1" className="w-16 text-center text-xs border border-gray-200 rounded py-1" value={it.qty} onChange={e => setItemQty(i, Number(e.target.value) || 1)} />
+            <div className="w-16 text-right text-xs shrink-0">{formatCurrency(it.isGiveaway ? 0 : it.unitPrice * it.qty)}</div>
+            <button onClick={() => removeItem(i)} className="p-1 text-gray-400 hover:text-red-500 shrink-0"><Icon name="x" className="w-3.5 h-3.5" /></button>
+          </div>
+        ))}
+        {form.items.length === 0 && <div className="px-3 py-4 text-xs text-gray-400 text-center">No items left in this order.</div>}
+      </div>
+      <div className="flex justify-between text-sm font-semibold border-t border-gray-200 pt-2"><span>Total</span><span>{formatCurrency(total)}</span></div>
+      <p className="text-[11px] text-gray-400 mt-2">Inventory stock is automatically adjusted to match any quantity changes you make here.</p>
+    </Modal>
+  );
+}
+
+/* -------- Delete order dialog (single or bulk, with restock choice) -------- */
+function DeleteOrderDialog({ ordersToDelete, onClose, onConfirm }) {
+  const [restock, setRestock] = useState(true);
+  useEffect(() => { setRestock(true); }, [ordersToDelete]);
+  if (!ordersToDelete || ordersToDelete.length === 0) return null;
+  const count = ordersToDelete.length;
+  const anyCountable = ordersToDelete.some(isCountableOrder);
+  return (
+    <Modal open={!!ordersToDelete} onClose={onClose} title={count > 1 ? `Delete ${count} Orders` : `Delete Order ${ordersToDelete[0].orderNumber}`} width="max-w-md"
+      footer={<><Button variant="outline" onClick={onClose}>Cancel</Button><Button variant="danger" onClick={() => onConfirm(restock)}>Delete {count > 1 ? `${count} Orders` : "Order"}</Button></>}>
+      <div className="flex gap-3 mb-4">
+        <div className="shrink-0 text-red-500"><Icon name="alert" className="w-6 h-6" /></div>
+        <p className="text-sm text-gray-600">This permanently removes {count > 1 ? `these ${count} orders` : "this order"} from the sales log and cannot be undone.</p>
+      </div>
+      {anyCountable && (
+        <label className="flex items-center gap-2 text-sm border border-gray-200 rounded-md px-3 py-2.5 cursor-pointer">
+          <input type="checkbox" checked={restock} onChange={e => setRestock(e.target.checked)} />
+          Return sold quantities back to inventory stock (recommended)
+        </label>
+      )}
+    </Modal>
+  );
+}
+
+/* =========================================================================
+   POS VIEW
+   ========================================================================= */
+const POS_FILTERS = [
+  { key: "all", label: "All Products" },
+  { key: "inStock", label: "In Stock" },
+  { key: "outOfStock", label: "Out of Stock" },
+  { key: "promotion", label: "Promotion" },
+  { key: "lowStock", label: "Low Stock" },
+];
+
+function POSView({ currentUser, products, setProducts, events, salesPeople, paymentMethods, setPaymentMethods, orders, setOrders }) {
+  const [subTab, setSubTab] = useState("sale"); // 'sale' | 'history'
+
+  const [eventId, setEventId] = useState(events[0]?.id || "");
+  const [salesPersonId, setSalesPersonId] = useState(salesPeople[0]?.id || "");
+  const [paymentMethodId, setPaymentMethodId] = useState(paymentMethods[0]?.id || "");
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerRemark, setCustomerRemark] = useState("");
+
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [cart, setCart] = useState([]);
+  const [discount, setDiscount] = useState(0);
+  const [amountReceived, setAmountReceived] = useState("");
+
+  const [showGiveaway, setShowGiveaway] = useState(false);
+  const [showAddPM, setShowAddPM] = useState(false);
+  const [newPMName, setNewPMName] = useState("");
+  const [lastOrder, setLastOrder] = useState(null);
+  const [viewOrder, setViewOrder] = useState(null);
+  const [editOrderTarget, setEditOrderTarget] = useState(null);
+  const [deleteOrderTargets, setDeleteOrderTargets] = useState(null); // array of orders, or null
+  const [selectedOrderIds, setSelectedOrderIds] = useState(() => new Set());
+  const [historySearch, setHistorySearch] = useState("");
+  const [toasts, setToasts] = useState([]);
+
+  function pushToast(message) {
+    const id = genId("t");
+    setToasts(t => [...t, { id, message }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 2600);
+  }
+
+  const selectedEvent = events.find(e => e.id === eventId) || null;
+
+  /* ---------- product grid ---------- */
+  const matchedProducts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let list = products;
+    if (q) list = list.filter(p => (p.name || "").toLowerCase().includes(q) || (p.brand || "").toLowerCase().includes(q) || (p.barcode || "").toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q));
+    switch (filter) {
+      case "inStock": list = list.filter(p => availableStock(p) > 10); break;
+      case "outOfStock": list = list.filter(p => availableStock(p) <= 0); break;
+      case "lowStock": list = list.filter(p => availableStock(p) > 0 && availableStock(p) <= 10); break;
+      case "promotion": list = list.filter(p => (p.promotions || []).some(pr => pr.active)); break;
+      default: break;
+    }
+    return list;
+  }, [products, search, filter]);
+  const visibleProducts = matchedProducts.slice(0, 60);
+
+  /* ---------- cart ---------- */
+  function addToCart(product, priceOption) {
+    const avail = availableStock(product);
+    const existingQty = cart.filter(c => c.productId === product.id).reduce((s, c) => s + c.qty, 0);
+    if (existingQty >= avail) { pushToast(`Only ${avail} in stock`); return; }
+    setCart(c => {
+      const existing = c.find(ci => ci.productId === product.id && ci.priceLabel === priceOption.label);
+      if (existing) return c.map(ci => ci === existing ? { ...ci, qty: ci.qty + 1 } : ci);
+      return [...c, { cartId: genId("ci"), productId: product.id, name: product.name, brand: product.brand, sku: product.sku, unitPrice: priceOption.price, priceLabel: priceOption.label, qty: 1, isGiveaway: false, remark: "" }];
+    });
+  }
+  function setCartQty(cartId, qty) {
+    setCart(c => c.map(ci => {
+      if (ci.cartId !== cartId) return ci;
+      if (ci.isGiveaway) return { ...ci, qty: Math.max(1, qty) };
+      const product = products.find(p => p.id === ci.productId);
+      const avail = product ? availableStock(product) : 999999;
+      return { ...ci, qty: Math.min(Math.max(1, qty), Math.max(1, avail)) };
+    }));
+  }
+  function incQty(cartId) { const it = cart.find(c => c.cartId === cartId); if (it) setCartQty(cartId, it.qty + 1); }
+  function decQty(cartId) { const it = cart.find(c => c.cartId === cartId); if (it) { if (it.qty <= 1) removeFromCart(cartId); else setCartQty(cartId, it.qty - 1); } }
+  function removeFromCart(cartId) { setCart(c => c.filter(ci => ci.cartId !== cartId)); }
+  function addGiveaway(item) { setCart(c => [...c, { cartId: genId("ci"), ...item }]); setShowGiveaway(false); }
+
+  const subtotal = cart.reduce((s, it) => s + (it.isGiveaway ? 0 : it.unitPrice * it.qty), 0);
+  const total = Math.max(0, subtotal - (Number(discount) || 0));
+  const totalQty = cart.reduce((s, it) => s + it.qty, 0);
+  const giveawayQty = cart.filter(it => it.isGiveaway).reduce((s, it) => s + it.qty, 0);
+  const change = Math.max(0, (Number(amountReceived) || 0) - total);
+
+  function resetCartForm() {
+    setCart([]); setCustomerName(""); setCustomerPhone(""); setCustomerRemark(""); setAmountReceived(""); setDiscount(0);
+  }
+
+  function completeSale() {
+    if (cart.length === 0) { pushToast("Cart is empty"); return; }
+    if (!eventId) { pushToast("Select an event"); return; }
+    if (!salesPersonId) { pushToast("Select a sales person"); return; }
+    if (!paymentMethodId) { pushToast("Select a payment method"); return; }
+    const recv = Number(amountReceived) || 0;
+    if (recv < total) { pushToast("Amount received is less than the total"); return; }
+    const ev = events.find(e => e.id === eventId);
+    const sp = salesPeople.find(s => s.id === salesPersonId);
+    const pm = paymentMethods.find(p => p.id === paymentMethodId);
+    const orderNumber = nextOrderNumber(orders, new Date());
+    const newOrder = {
+      id: genId("ord"), orderNumber,
+      eventId, eventName: ev?.name || "",
+      salesPersonId, salesPersonName: sp?.name || "", salesPersonPosition: sp?.position || "",
+      paymentMethodId, paymentMethod: pm?.name || "",
+      customerName, customerPhone, customerRemark,
+      items: cart.map(({ cartId, ...rest }) => rest),
+      subtotal, discount: Number(discount) || 0, total,
+      amountReceived: recv, change: recv - total,
+      paymentStatus: "Paid", status: "completed", isDraft: false,
+      createdAt: new Date().toISOString(),
+    };
+    setOrders(o => [newOrder, ...o]);
+    applyOrderStockDeduction(setProducts, newOrder.items, { user: currentUser.name, orderNumber, eventName: newOrder.eventName });
+    setLastOrder(newOrder);
+    resetCartForm();
+  }
+  function saveDraft() {
+    if (cart.length === 0) { pushToast("Cart is empty"); return; }
+    const ev = events.find(e => e.id === eventId);
+    const sp = salesPeople.find(s => s.id === salesPersonId);
+    const pm = paymentMethods.find(p => p.id === paymentMethodId);
+    const draft = {
+      id: genId("ord"), orderNumber: "DRAFT-" + genId("d").slice(-6).toUpperCase(),
+      eventId, eventName: ev?.name || "", salesPersonId, salesPersonName: sp?.name || "", salesPersonPosition: sp?.position || "",
+      paymentMethodId, paymentMethod: pm?.name || "",
+      customerName, customerPhone, customerRemark,
+      items: cart.map(({ cartId, ...rest }) => rest),
+      subtotal, discount: Number(discount) || 0, total,
+      amountReceived: 0, change: 0, paymentStatus: "Draft", status: "draft", isDraft: true,
+      createdAt: new Date().toISOString(),
+    };
+    setOrders(o => [draft, ...o]);
+    pushToast("Draft saved");
+    resetCartForm();
+  }
+  function cancelSale() { resetCartForm(); pushToast("Sale cancelled"); }
+
+  function refundOrder(orderId) {
+    const order = orders.find(o => o.id === orderId);
+    if (!order || order.status !== "completed") return;
+    setOrders(os => os.map(o => o.id === orderId ? { ...o, status: "refunded", paymentStatus: "Refunded" } : o));
+    applyOrderStockRestock(setProducts, order.items, { user: currentUser.name, orderNumber: order.orderNumber });
+    pushToast(`Order ${order.orderNumber} refunded`);
+    setViewOrder(null);
+  }
+  function cancelDraft(orderId) {
+    setOrders(os => os.map(o => o.id === orderId ? { ...o, status: "cancelled", paymentStatus: "Cancelled" } : o));
+    pushToast("Draft cancelled");
+    setViewOrder(null);
+  }
+  function duplicateOrder(order) {
+    setEventId(order.eventId); setSalesPersonId(order.salesPersonId); setPaymentMethodId(order.paymentMethodId);
+    setCustomerName(order.customerName || ""); setCustomerPhone(order.customerPhone || ""); setCustomerRemark(order.customerRemark || "");
+    setCart(order.items.map(it => ({ cartId: genId("ci"), ...it })));
+    setDiscount(order.discount || 0);
+    setViewOrder(null);
+    setSubTab("sale");
+    pushToast("Order duplicated into cart — review and complete sale");
+  }
+  function addCustomPaymentMethod() {
+    if (!newPMName.trim()) return;
+    const pm = { id: genId("pm"), name: newPMName.trim(), builtIn: false };
+    setPaymentMethods(p => [...p, pm]);
+    setPaymentMethodId(pm.id);
+    setNewPMName(""); setShowAddPM(false);
+  }
+  function saveOrderEdit(order, patch) {
+    const wasCountable = isCountableOrder(order);
+    setOrders(os => os.map(o => o.id === order.id ? { ...o, ...patch } : o));
+    if (wasCountable) reconcileOrderItemStock(setProducts, order.items, patch.items, { user: currentUser.name, orderNumber: order.orderNumber });
+    pushToast(`Order ${order.orderNumber} updated`);
+    setEditOrderTarget(null);
+    setViewOrder(null);
+  }
+  function deleteOrders(orderIds, restock) {
+    const toDelete = orders.filter(o => orderIds.includes(o.id));
+    if (restock) toDelete.forEach(o => { if (isCountableOrder(o)) applyOrderStockRestock(setProducts, o.items, { user: currentUser.name, orderNumber: o.orderNumber }); });
+    setOrders(os => os.filter(o => !orderIds.includes(o.id)));
+    setSelectedOrderIds(s => { const n = new Set(s); orderIds.forEach(id => n.delete(id)); return n; });
+    pushToast(`${orderIds.length} order${orderIds.length !== 1 ? "s" : ""} deleted`);
+    setDeleteOrderTargets(null);
+    setViewOrder(null);
+  }
+  function toggleOrderSelect(id) { setSelectedOrderIds(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
+  function toggleAllOrdersOnPage(pageOrders) {
+    const ids = pageOrders.map(o => o.id);
+    const allSelected = ids.every(id => selectedOrderIds.has(id));
+    setSelectedOrderIds(s => { const n = new Set(s); allSelected ? ids.forEach(id => n.delete(id)) : ids.forEach(id => n.add(id)); return n; });
+  }
+
+  /* ---------- summary stats ---------- */
+  const summary = useMemo(() => {
+    const todayStr = new Date().toDateString();
+    const completed = orders.filter(isCountableOrder);
+    const today = completed.filter(o => new Date(o.createdAt).toDateString() === todayStr);
+    const totalRevenue = completed.reduce((s, o) => s + o.total, 0);
+    const todayRevenue = today.reduce((s, o) => s + o.total, 0);
+    const unitsSold = completed.reduce((s, o) => s + orderUnits(o, false), 0);
+    const giveawayUnits = completed.reduce((s, o) => s + (o.items || []).filter(it => it.isGiveaway).reduce((s2, it) => s2 + it.qty, 0), 0);
+    return { totalRevenue, todayRevenue, totalOrders: completed.length, todayOrders: today.length, unitsSold, giveawayUnits, avgOrderValue: completed.length ? totalRevenue / completed.length : 0 };
+  }, [orders]);
+
+  const filteredOrders = useMemo(() => {
+    const q = historySearch.trim().toLowerCase();
+    if (!q) return orders;
+    return orders.filter(o => o.orderNumber.toLowerCase().includes(q) || o.eventName.toLowerCase().includes(q) || o.salesPersonName.toLowerCase().includes(q) || o.paymentMethod.toLowerCase().includes(q) || formatDate(o.createdAt).toLowerCase().includes(q) || o.items.some(it => it.name.toLowerCase().includes(q)));
+  }, [orders, historySearch]);
+
+  const eventOptions = events.map(e => ({ id: e.id, label: e.name, searchText: `${e.name} ${e.location}`, date: e.date, location: e.location }));
+  const spOptions = salesPeople.map(s => ({ id: s.id, label: `${s.name} — ${s.position}`, searchText: `${s.name} ${s.position}` }));
+
+  return (
+    <div className="px-6 py-5 max-w-[1600px] mx-auto">
+      {/* summary cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-5">
+        {[
+          ["Total Revenue", formatCurrency(summary.totalRevenue)],
+          ["Today's Revenue", formatCurrency(summary.todayRevenue)],
+          ["Total Orders", summary.totalOrders.toLocaleString()],
+          ["Today's Orders", summary.todayOrders.toLocaleString()],
+          ["Units Sold", summary.unitsSold.toLocaleString()],
+          ["Giveaway Units", summary.giveawayUnits.toLocaleString()],
+          ["Avg Order Value", formatCurrency(Math.round(summary.avgOrderValue))],
+        ].map(([label, val]) => (
+          <div key={label} className="bg-white border border-gray-200 rounded-lg p-3">
+            <div className="text-[10px] text-gray-500 mb-1">{label}</div>
+            <div className="text-base font-semibold text-gray-900">{val}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-1 bg-gray-100 rounded-md p-1 mb-4 w-fit">
+        {[["sale", "New Sale"], ["history", "Order History"]].map(([k, label]) => (
+          <button key={k} onClick={() => setSubTab(k)} className={classNames("px-3.5 py-1.5 rounded text-sm font-medium", subTab === k ? "bg-white text-brand-800 shadow-sm" : "text-gray-500 hover:text-gray-700")}>{label}</button>
+        ))}
+      </div>
+
+      {subTab === "sale" ? (
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-4 items-start">
+          {/* LEFT: event/sales info + product grid */}
+          <div className="space-y-4">
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Field label="Event *">
+                  <SearchableSelect value={eventId} onChange={setEventId} options={eventOptions} placeholder="Search events…" />
+                  {selectedEvent && <p className="text-[11px] text-gray-400 mt-1">{formatDate(selectedEvent.date)} · {selectedEvent.location}</p>}
+                </Field>
+                <Field label="Sales Person *">
+                  <SearchableSelect value={salesPersonId} onChange={setSalesPersonId} options={spOptions} placeholder="Search staff…" />
+                </Field>
+                <Field label="Payment Method *">
+                  <div className="flex gap-1.5">
+                    <select className={inputCls} value={paymentMethodId} onChange={e => setPaymentMethodId(e.target.value)}>
+                      {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
+                    </select>
+                    <button onClick={() => setShowAddPM(true)} className="px-2 border border-gray-300 rounded-md text-gray-500 hover:bg-gray-50" title="Add payment method"><Icon name="plus" className="w-4 h-4" /></button>
+                  </div>
+                </Field>
+              </div>
+              <details className="mt-3">
+                <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700 select-none">+ Customer information (optional)</summary>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
+                  <Field label="Customer Name"><input className={inputCls} value={customerName} onChange={e => setCustomerName(e.target.value)} /></Field>
+                  <Field label="Phone Number"><input className={inputCls} value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} /></Field>
+                  <Field label="Remark"><input className={inputCls} value={customerRemark} onChange={e => setCustomerRemark(e.target.value)} /></Field>
+                </div>
+              </details>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="relative mb-3">
+                <Icon name="search" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input autoFocus className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-brand-400"
+                  placeholder="Search products by name, barcode, SKU, or brand…" value={search} onChange={e => setSearch(e.target.value)} />
+              </div>
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {POS_FILTERS.map(f => (
+                  <button key={f.key} onClick={() => setFilter(f.key)} className={classNames("px-2.5 py-1 rounded-full text-xs font-medium border", filter === f.key ? "bg-brand-700 border-brand-700 text-white" : "border-gray-300 text-gray-600 hover:bg-gray-50")}>{f.label}</button>
+                ))}
+                <button onClick={() => setShowGiveaway(true)} className="ml-auto px-2.5 py-1 rounded-full text-xs font-medium border border-blue-300 text-blue-700 hover:bg-blue-50">+ Giveaway</button>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+                {visibleProducts.map(p => <POSProductCard key={p.id} product={p} onAdd={addToCart} />)}
+              </div>
+              {visibleProducts.length === 0 && <p className="text-center text-sm text-gray-400 py-10">No products match your search or filter.</p>}
+              {matchedProducts.length > visibleProducts.length && <p className="text-center text-[11px] text-gray-400 mt-3">Showing {visibleProducts.length} of {matchedProducts.length.toLocaleString()} — refine your search to narrow down.</p>}
+            </div>
+          </div>
+
+          {/* RIGHT: cart + payment */}
+          <div className="bg-white border border-gray-200 rounded-lg p-4 lg:sticky lg:top-[76px] space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-900">Cart</h3>
+              <span className="text-xs text-gray-400">{totalQty} item{totalQty !== 1 ? "s" : ""}</span>
+            </div>
+            <div className="max-h-64 overflow-y-auto -mx-1 px-1">
+              {cart.length === 0 && <p className="text-xs text-gray-400 italic py-6 text-center">Cart is empty — add products from the left.</p>}
+              {cart.map(item => (
+                <CartRow key={item.cartId} item={item}
+                  onInc={() => incQty(item.cartId)} onDec={() => decQty(item.cartId)}
+                  onRemove={() => removeFromCart(item.cartId)} onQtyChange={q => setCartQty(item.cartId, q)} />
+              ))}
+            </div>
+
+            <div className="border-t border-gray-200 pt-3 space-y-1.5 text-sm">
+              <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
+              <div className="flex justify-between items-center text-gray-600">
+                <span>Discount (THB)</span>
+                <input type="number" min="0" className="w-24 text-right px-2 py-1 text-sm border border-gray-200 rounded" value={discount} onChange={e => setDiscount(Math.max(0, Number(e.target.value) || 0))} />
+              </div>
+              <div className="flex justify-between text-gray-500 text-xs"><span>Total quantity</span><span>{totalQty} ({giveawayQty} giveaway)</span></div>
+              <div className="flex justify-between text-gray-500 text-xs"><span>Different products</span><span>{cart.length}</span></div>
+              <div className="flex justify-between text-base font-semibold pt-1.5 border-t border-gray-200"><span>Total</span><span>{formatCurrency(total)}</span></div>
+            </div>
+
+            <div className="border-t border-gray-200 pt-3 space-y-2">
+              <Field label="Amount Received (THB)">
+                <input type="number" min="0" className={inputCls} value={amountReceived} onChange={e => setAmountReceived(e.target.value)} placeholder={String(total)} />
+              </Field>
+              <div className="flex justify-between text-sm"><span className="text-gray-500">Change</span><span className="font-medium">{formatCurrency(change)}</span></div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <Button variant="outline" onClick={saveDraft}>Save Draft</Button>
+              <Button variant="outline" onClick={cancelSale}>Cancel</Button>
+            </div>
+            <Button className="w-full" size="lg" onClick={completeSale}><Icon name="check" className="w-4 h-4" />Complete Sale</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="p-3 border-b border-gray-200 flex flex-wrap items-center gap-2">
+            <div className="relative max-w-md flex-1 min-w-[220px]">
+              <Icon name="search" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md" placeholder="Search order #, product, event, sales person, date, payment…" value={historySearch} onChange={e => setHistorySearch(e.target.value)} />
+            </div>
+            {selectedOrderIds.size > 0 && (
+              <Button variant="danger" size="sm" onClick={() => setDeleteOrderTargets(orders.filter(o => selectedOrderIds.has(o.id)))}>
+                <Icon name="trash" className="w-3.5 h-3.5" />Delete Selected ({selectedOrderIds.size})
+              </Button>
+            )}
+            {orders.length > 0 && (
+              <button onClick={() => setDeleteOrderTargets(orders)} className="text-xs text-red-500 hover:text-red-700 hover:underline shrink-0">Delete All Orders</button>
+            )}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500 text-left">
+                <tr>
+                  <th className="px-3 py-2 w-8"><input type="checkbox" checked={filteredOrders.slice(0, 200).length > 0 && filteredOrders.slice(0, 200).every(o => selectedOrderIds.has(o.id))} onChange={() => toggleAllOrdersOnPage(filteredOrders.slice(0, 200))} /></th>
+                  <th className="px-3 py-2">Time</th><th className="px-3 py-2">Order #</th><th className="px-3 py-2">Sales Person</th><th className="px-3 py-2">Event</th><th className="px-3 py-2">Total</th><th className="px-3 py-2">Payment</th><th className="px-3 py-2">Status</th><th className="px-3 py-2 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredOrders.slice(0, 200).map(o => (
+                  <tr key={o.id} className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => setViewOrder(o)}>
+                    <td className="px-3 py-2" onClick={e => e.stopPropagation()}><input type="checkbox" checked={selectedOrderIds.has(o.id)} onChange={() => toggleOrderSelect(o.id)} /></td>
+                    <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{formatDateTime(o.createdAt)}</td>
+                    <td className="px-3 py-2 font-mono text-xs">{o.orderNumber}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">{o.salesPersonName}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">{o.eventName}</td>
+                    <td className="px-3 py-2 font-medium">{formatCurrency(o.total)}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">{o.paymentMethod}</td>
+                    <td className="px-3 py-2"><Badge color={o.status === "completed" ? "green" : o.status === "refunded" ? "amber" : o.status === "draft" ? "blue" : "red"}>{o.status}</Badge></td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => setViewOrder(o)} className="text-xs text-brand-700 hover:underline mr-2">View</button>
+                      {(o.status === "completed" || o.isDraft) && <button onClick={() => setEditOrderTarget(o)} className="text-xs text-gray-500 hover:underline mr-2">Edit</button>}
+                      <button onClick={() => setDeleteOrderTargets([o])} className="text-xs text-red-500 hover:underline">Delete</button>
+                    </td>
+                  </tr>
+                ))}
+                {filteredOrders.length === 0 && <tr><td colSpan={9} className="px-3 py-12 text-center text-gray-400">No orders found.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <GiveawayModal open={showGiveaway} products={products} onClose={() => setShowGiveaway(false)} onAdd={addGiveaway} />
+      <OrderDetailModal order={viewOrder} onClose={() => setViewOrder(null)} onRefund={refundOrder} onCancelDraft={cancelDraft} onDuplicate={duplicateOrder}
+        onEdit={o => { setViewOrder(null); setEditOrderTarget(o); }} onDelete={o => { setViewOrder(null); setDeleteOrderTargets([o]); }} />
+      <EditOrderModal order={editOrderTarget} events={events} salesPeople={salesPeople} paymentMethods={paymentMethods} onSave={saveOrderEdit} onClose={() => setEditOrderTarget(null)} />
+      <DeleteOrderDialog ordersToDelete={deleteOrderTargets} onClose={() => setDeleteOrderTargets(null)} onConfirm={restock => deleteOrders(deleteOrderTargets.map(o => o.id), restock)} />
+
+      <Modal open={showAddPM} onClose={() => setShowAddPM(false)} title="Add Payment Method" width="max-w-sm"
+        footer={<><Button variant="outline" onClick={() => setShowAddPM(false)}>Cancel</Button><Button onClick={addCustomPaymentMethod}>Add</Button></>}>
+        <Field label="Method name"><input className={inputCls} value={newPMName} onChange={e => setNewPMName(e.target.value)} placeholder="e.g. Alipay" autoFocus /></Field>
+      </Modal>
+
+      <Modal open={!!lastOrder} onClose={() => setLastOrder(null)} title="Sale Complete" width="max-w-sm">
+        {lastOrder && (
+          <div className="text-center py-4">
+            <Icon name="check" className="w-10 h-10 mx-auto text-green-500 mb-3" />
+            <p className="text-sm text-gray-700">Order <strong>{lastOrder.orderNumber}</strong> completed.</p>
+            <p className="text-xs text-gray-400 mt-1">Total {formatCurrency(lastOrder.total)} · Change {formatCurrency(lastOrder.change)}</p>
+            <div className="flex justify-center gap-2 mt-4">
+              <Button variant="outline" onClick={() => window.print()}>Print Receipt</Button>
+              <Button onClick={() => setLastOrder(null)}>New Sale</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Toast toasts={toasts} />
+    </div>
+  );
+}
+
+/* =========================================================================
+   DASHBOARD — date/bucket helpers + hand-rolled SVG charts (no chart-lib
+   dependency, so the demo has zero risk of a broken CDN import).
+   ========================================================================= */
+function getDateRange(preset, customFrom, customTo) {
+  const now = new Date();
+  const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const endOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+  if (preset === "today") return [startOfDay(now), endOfDay(now)];
+  if (preset === "yesterday") { const y = new Date(now); y.setDate(y.getDate() - 1); return [startOfDay(y), endOfDay(y)]; }
+  if (preset === "thisWeek") { const d = new Date(now); const day = d.getDay(); const diff = day === 0 ? 6 : day - 1; const monday = new Date(d); monday.setDate(d.getDate() - diff); return [startOfDay(monday), endOfDay(now)]; }
+  if (preset === "thisMonth") return [new Date(now.getFullYear(), now.getMonth(), 1), endOfDay(now)];
+  if (preset === "thisYear") return [new Date(now.getFullYear(), 0, 1), endOfDay(now)];
+  if (preset === "custom") return [customFrom ? startOfDay(new Date(customFrom)) : null, customTo ? endOfDay(new Date(customTo)) : null];
+  return [null, null];
+}
+function bucketKey(dateStr, grouping) {
+  const d = new Date(dateStr);
+  if (grouping === "hourly") return d.toISOString().slice(0, 13);
+  if (grouping === "weekly") { const onejan = new Date(d.getFullYear(), 0, 1); const week = Math.ceil(((d - onejan) / 86400000 + onejan.getDay() + 1) / 7); return `${d.getFullYear()}-W${pad(week, 2)}`; }
+  if (grouping === "monthly") return `${d.getFullYear()}-${pad(d.getMonth() + 1, 2)}`;
+  if (grouping === "yearly") return `${d.getFullYear()}`;
+  return d.toISOString().slice(0, 10); // daily
+}
+const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function shortenBucketLabel(key, grouping) {
+  if (grouping === "hourly") return key.slice(11, 13) + ":00";
+  if (grouping === "weekly") return key.split("-")[1];
+  if (grouping === "monthly") { const [y, m] = key.split("-"); return `${MONTH_ABBR[Number(m) - 1]} ${y}`; }
+  if (grouping === "yearly") return key;
+  const [y, m, d] = key.split("-"); return `${MONTH_ABBR[Number(m) - 1]} ${Number(d)}`;
+}
+const CHART_PALETTE = ["#227058", "#2563eb", "#d97706", "#dc2626", "#7c3aed", "#0891b2", "#65a30d"];
+
+function LineChartSVG({ data, height = 180, color = "#227058" }) {
+  const width = 640;
+  const padding = { top: 12, right: 12, bottom: 22, left: 8 };
+  const max = Math.max(1, ...data.map(d => d.value));
+  const innerW = width - padding.left - padding.right;
+  const innerH = height - padding.top - padding.bottom;
+  const stepX = data.length > 1 ? innerW / (data.length - 1) : 0;
+  const points = data.map((d, i) => [padding.left + i * stepX, padding.top + innerH - (d.value / max) * innerH]);
+  const linePath = points.map((p, i) => (i === 0 ? "M" : "L") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+  const areaPath = points.length ? linePath + ` L${(padding.left + innerW).toFixed(1)},${(padding.top + innerH).toFixed(1)} L${padding.left},${(padding.top + innerH).toFixed(1)} Z` : "";
+  const [hoverIdx, setHoverIdx] = useState(null);
+  const labelEvery = Math.max(1, Math.ceil(data.length / 8));
+  if (data.length === 0) return <div className="h-[180px] flex items-center justify-center text-xs text-gray-400">No data for this period.</div>;
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" onMouseLeave={() => setHoverIdx(null)}>
+      <line x1={padding.left} y1={padding.top + innerH} x2={padding.left + innerW} y2={padding.top + innerH} stroke="#e5e7eb" />
+      <path d={areaPath} fill={color} fillOpacity="0.08" stroke="none" />
+      <path d={linePath} fill="none" stroke={color} strokeWidth="2" />
+      {points.map((p, i) => (
+        <rect key={i} x={p[0] - stepX / 2} y={padding.top} width={Math.max(stepX, 4)} height={innerH} fill="transparent" onMouseEnter={() => setHoverIdx(i)} />
+      ))}
+      {points.map((p, i) => <circle key={"c" + i} cx={p[0]} cy={p[1]} r={hoverIdx === i ? 4 : 2.5} fill={color} pointerEvents="none" />)}
+      {hoverIdx !== null && (
+        <g pointerEvents="none">
+          <line x1={points[hoverIdx][0]} y1={padding.top} x2={points[hoverIdx][0]} y2={padding.top + innerH} stroke="#9ca3af" strokeDasharray="3,3" />
+          <text x={Math.min(Math.max(points[hoverIdx][0], 60), width - 90)} y={padding.top + 12} className="text-[10px] fill-gray-700 font-medium">{data[hoverIdx].label}: {formatCurrency(data[hoverIdx].value)}</text>
+        </g>
+      )}
+      {data.map((d, i) => (i % labelEvery === 0) && <text key={"t" + i} x={points[i][0]} y={height - 6} textAnchor="middle" className="text-[9px] fill-gray-400">{d.label}</text>)}
+    </svg>
+  );
+}
+function BarListChart({ data, valueFormatter = formatCurrency, color = "#227058" }) {
+  const max = Math.max(1, ...data.map(d => d.value));
+  if (!data.length) return <p className="text-xs text-gray-400 italic py-4 text-center">No data.</p>;
+  return (
+    <div className="space-y-2.5">
+      {data.map((d, i) => (
+        <div key={i} className="flex items-center gap-2 text-xs">
+          <div className="w-32 truncate text-gray-600 shrink-0">{d.label}</div>
+          <div className="flex-1 bg-gray-100 rounded h-3 overflow-hidden">
+            <div className="h-full rounded" style={{ width: `${(d.value / max) * 100}%`, backgroundColor: color }} />
+          </div>
+          <div className="w-20 text-right font-medium text-gray-800 shrink-0">{valueFormatter(d.value)}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+function DonutChart({ data, size = 150 }) {
+  const total = data.reduce((s, d) => s + d.value, 0) || 1;
+  const radius = size / 2 - 12, cx = size / 2, cy = size / 2, circumference = 2 * Math.PI * radius;
+  let cumulative = 0;
+  return (
+    <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size}>
+      <circle cx={cx} cy={cy} r={radius} fill="none" stroke="#f3f4f6" strokeWidth="18" />
+      {data.map((d, i) => {
+        const frac = d.value / total;
+        const dash = frac * circumference;
+        const offset = -cumulative * circumference;
+        cumulative += frac;
+        return <circle key={i} cx={cx} cy={cy} r={radius} fill="none" stroke={d.color} strokeWidth="18"
+          strokeDasharray={`${dash} ${Math.max(0, circumference - dash)}`} strokeDashoffset={offset} transform={`rotate(-90 ${cx} ${cy})`} />;
+      })}
+      <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" className="text-xs font-semibold fill-gray-800">{formatCurrency(total)}</text>
+    </svg>
+  );
+}
+function MultiSelectDropdown({ label, options, selected, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    function onDoc(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+  const allSelected = selected.length === 0;
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" onClick={() => setOpen(o => !o)} className="flex items-center justify-between gap-2 px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:border-gray-400 min-w-[160px]">
+        <span className="truncate">{label}: {allSelected ? "All" : `${selected.length} selected`}</span>
+        <Icon name="chevronDown" className="w-4 h-4 text-gray-400 shrink-0" />
+      </button>
+      {open && (
+        <div className="absolute z-30 mt-1 w-56 bg-white border border-gray-200 rounded-md shadow-lg fade-in py-1 max-h-64 overflow-y-auto">
+          <label className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+            <input type="checkbox" checked={allSelected} onChange={() => onChange([])} />All {label}
+          </label>
+          {options.map(o => (
+            <label key={o.id} className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50 cursor-pointer">
+              <input type="checkbox" checked={selected.includes(o.id)} onChange={() => onChange(selected.includes(o.id) ? selected.filter(id => id !== o.id) : [...selected, o.id])} />
+              {o.label}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EventDetailModal({ event, orders, onClose }) {
+  if (!event) return null;
+  const evOrders = orders.filter(o => o.eventId === event.id && isCountableOrder(o));
+  const revenue = evOrders.reduce((s, o) => s + o.total, 0);
+  const unitsSold = evOrders.reduce((s, o) => s + orderUnits(o, false), 0);
+  const giveaways = evOrders.reduce((s, o) => s + (o.items || []).filter(it => it.isGiveaway).reduce((s2, it) => s2 + it.qty, 0), 0);
+  const bySP = {}; evOrders.forEach(o => { bySP[o.salesPersonName] = (bySP[o.salesPersonName] || 0) + o.total; });
+  const bestSP = Object.entries(bySP).sort((a, b) => b[1] - a[1])[0];
+  const byProduct = {}; evOrders.forEach(o => o.items.forEach(it => { if (!it.isGiveaway) byProduct[it.name] = (byProduct[it.name] || 0) + it.unitPrice * it.qty; }));
+  const bestProducts = Object.entries(byProduct).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const byPM = {}; evOrders.forEach(o => { byPM[o.paymentMethod] = (byPM[o.paymentMethod] || 0) + o.total; });
+  const byPromo = {}; evOrders.forEach(o => o.items.forEach(it => { if (it.priceLabel && it.priceLabel !== "RRP" && !it.isGiveaway) byPromo[it.priceLabel] = (byPromo[it.priceLabel] || 0) + it.qty; }));
+
+  return (
+    <Modal open={!!event} onClose={onClose} title={`Event — ${event.name}`} width="max-w-2xl">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        {[["Revenue", formatCurrency(revenue)], ["Orders", evOrders.length], ["Units Sold", unitsSold], ["Giveaways", giveaways]].map(([l, v]) => (
+          <div key={l} className="bg-gray-50 rounded-md p-2.5"><div className="text-[10px] text-gray-500">{l}</div><div className="font-semibold text-gray-900">{v}</div></div>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-4 text-sm">
+        <div>
+          <div className="text-xs font-medium text-gray-600 mb-1.5">Best Sales Person</div>
+          <p className="text-gray-800 mb-3">{bestSP ? `${bestSP[0]} — ${formatCurrency(bestSP[1])}` : "—"}</p>
+          <div className="text-xs font-medium text-gray-600 mb-1.5">Payment Breakdown</div>
+          {Object.keys(byPM).length === 0 && <p className="text-xs text-gray-400">—</p>}
+          {Object.entries(byPM).map(([k, v]) => <div key={k} className="flex justify-between text-xs py-0.5"><span className="text-gray-500">{k}</span><span>{formatCurrency(v)}</span></div>)}
+        </div>
+        <div>
+          <div className="text-xs font-medium text-gray-600 mb-1.5">Best Selling Products</div>
+          {bestProducts.length === 0 && <p className="text-xs text-gray-400 mb-3">—</p>}
+          {bestProducts.map(([name, rev]) => <div key={name} className="flex justify-between text-xs py-0.5"><span className="text-gray-700 truncate">{name}</span><span>{formatCurrency(rev)}</span></div>)}
+          <div className="text-xs font-medium text-gray-600 mb-1.5 mt-3">Promotion Usage</div>
+          {Object.keys(byPromo).length === 0 && <p className="text-xs text-gray-400">No promotions used.</p>}
+          {Object.entries(byPromo).map(([k, v]) => <div key={k} className="flex justify-between text-xs py-0.5"><span className="text-gray-500">{k}</span><span>{v} units</span></div>)}
+        </div>
+      </div>
+      <div className="flex justify-end pt-4"><Button variant="outline" onClick={onClose}>Close</Button></div>
+    </Modal>
+  );
+}
+
+/* =========================================================================
+   DASHBOARD VIEW
+   ========================================================================= */
+const DATE_PRESET_OPTIONS = [
+  { key: "today", label: "Today" }, { key: "yesterday", label: "Yesterday" },
+  { key: "thisWeek", label: "This Week" }, { key: "thisMonth", label: "This Month" },
+  { key: "thisYear", label: "This Year" }, { key: "custom", label: "Custom Range" },
+];
+const GROUPING_OPTIONS = [["hourly", "Hourly"], ["daily", "Daily"], ["weekly", "Weekly"], ["monthly", "Monthly"], ["yearly", "Yearly"]];
+const LOW_STOCK_THRESHOLD = 10;
+
+function DashboardView({ currentUser, products, setProducts, events, salesPeople, paymentMethods, orders, setOrders }) {
+  const [preset, setPreset] = useState("thisMonth");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const [eventFilter, setEventFilter] = useState([]);
+  const [salesPersonFilter, setSalesPersonFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all");
+  const [grouping, setGrouping] = useState("daily");
+  const [detailEvent, setDetailEvent] = useState(null);
+  const [detailOrder, setDetailOrder] = useState(null);
+  const [editOrderTarget, setEditOrderTarget] = useState(null);
+  const [deleteOrderTargets, setDeleteOrderTargets] = useState(null);
+  const [toasts, setToasts] = useState([]);
+  function pushToast(message) {
+    const id = genId("t");
+    setToasts(t => [...t, { id, message }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 2600);
+  }
+  function refundOrder(orderId) {
+    const order = orders.find(o => o.id === orderId);
+    if (!order || order.status !== "completed") return;
+    setOrders(os => os.map(o => o.id === orderId ? { ...o, status: "refunded", paymentStatus: "Refunded" } : o));
+    applyOrderStockRestock(setProducts, order.items, { user: currentUser.name, orderNumber: order.orderNumber });
+    pushToast(`Order ${order.orderNumber} refunded`);
+    setDetailOrder(null);
+  }
+  function cancelDraft(orderId) {
+    setOrders(os => os.map(o => o.id === orderId ? { ...o, status: "cancelled", paymentStatus: "Cancelled" } : o));
+    pushToast("Draft cancelled");
+    setDetailOrder(null);
+  }
+  function saveOrderEdit(order, patch) {
+    const wasCountable = isCountableOrder(order);
+    setOrders(os => os.map(o => o.id === order.id ? { ...o, ...patch } : o));
+    if (wasCountable) reconcileOrderItemStock(setProducts, order.items, patch.items, { user: currentUser.name, orderNumber: order.orderNumber });
+    pushToast(`Order ${order.orderNumber} updated`);
+    setEditOrderTarget(null);
+  }
+  function deleteOrders(orderIds, restock) {
+    const toDelete = orders.filter(o => orderIds.includes(o.id));
+    if (restock) toDelete.forEach(o => { if (isCountableOrder(o)) applyOrderStockRestock(setProducts, o.items, { user: currentUser.name, orderNumber: o.orderNumber }); });
+    setOrders(os => os.filter(o => !orderIds.includes(o.id)));
+    pushToast(`${orderIds.length} order${orderIds.length !== 1 ? "s" : ""} deleted`);
+    setDeleteOrderTargets(null);
+  }
+
+  const [rangeStart, rangeEnd] = getDateRange(preset, customFrom, customTo);
+
+  function inRange(o) {
+    if (!isCountableOrder(o)) return false;
+    const d = new Date(o.createdAt);
+    if (rangeStart && d < rangeStart) return false;
+    if (rangeEnd && d > rangeEnd) return false;
+    if (eventFilter.length && !eventFilter.includes(o.eventId)) return false;
+    if (salesPersonFilter !== "all" && o.salesPersonId !== salesPersonFilter) return false;
+    if (paymentFilter !== "all" && o.paymentMethodId !== paymentFilter) return false;
+    return true;
+  }
+  const filteredOrders = useMemo(() => orders.filter(inRange), [orders, rangeStart && rangeStart.getTime(), rangeEnd && rangeEnd.getTime(), eventFilter, salesPersonFilter, paymentFilter]);
+
+  const prevPeriodRevenueByEvent = useMemo(() => {
+    if (!rangeStart || !rangeEnd) return {};
+    const durationMs = rangeEnd.getTime() - rangeStart.getTime();
+    const prevEnd = new Date(rangeStart.getTime() - 1);
+    const prevStart = new Date(prevEnd.getTime() - durationMs);
+    const map = {};
+    orders.forEach(o => {
+      if (!isCountableOrder(o)) return;
+      const d = new Date(o.createdAt);
+      if (d < prevStart || d > prevEnd) return;
+      if (salesPersonFilter !== "all" && o.salesPersonId !== salesPersonFilter) return;
+      if (paymentFilter !== "all" && o.paymentMethodId !== paymentFilter) return;
+      map[o.eventId] = (map[o.eventId] || 0) + o.total;
+    });
+    return map;
+  }, [orders, rangeStart && rangeStart.getTime(), rangeEnd && rangeEnd.getTime(), salesPersonFilter, paymentFilter]);
+
+  const kpi = useMemo(() => {
+    const grossRevenue = filteredOrders.reduce((s, o) => s + o.subtotal, 0);
+    const netRevenue = filteredOrders.reduce((s, o) => s + o.total, 0);
+    const totalOrders = filteredOrders.length;
+    const unitsSold = filteredOrders.reduce((s, o) => s + orderUnits(o, false), 0);
+    const giveaways = filteredOrders.reduce((s, o) => s + (o.items || []).filter(it => it.isGiveaway).reduce((s2, it) => s2 + it.qty, 0), 0);
+    const avgOrderValue = totalOrders ? netRevenue / totalOrders : 0;
+    const inventoryValue = products.reduce((s, p) => s + (p.rrpPrice || 0) * p.currentStock, 0);
+    return { grossRevenue, netRevenue, totalOrders, unitsSold, giveaways, avgOrderValue, inventoryValue };
+  }, [filteredOrders, products]);
+
+  const trendData = useMemo(() => {
+    const buckets = {};
+    filteredOrders.forEach(o => { const k = bucketKey(o.createdAt, grouping); buckets[k] = (buckets[k] || 0) + o.total; });
+    return Object.keys(buckets).sort().map(k => ({ label: shortenBucketLabel(k, grouping), value: buckets[k] }));
+  }, [filteredOrders, grouping]);
+
+  const salesByEvent = useMemo(() => events.map(ev => {
+    const evOrders = filteredOrders.filter(o => o.eventId === ev.id);
+    const revenue = evOrders.reduce((s, o) => s + o.total, 0);
+    const unitsSold = evOrders.reduce((s, o) => s + orderUnits(o, false), 0);
+    const prevRevenue = prevPeriodRevenueByEvent[ev.id] || 0;
+    const growthPct = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : (revenue > 0 ? 100 : 0);
+    return { event: ev, revenue, orders: evOrders.length, unitsSold, avgOrderValue: evOrders.length ? revenue / evOrders.length : 0, growthPct };
+  }).filter(r => r.orders > 0).sort((a, b) => b.revenue - a.revenue), [filteredOrders, events, prevPeriodRevenueByEvent]);
+
+  const productAgg = useMemo(() => {
+    const map = {};
+    filteredOrders.forEach(o => o.items.forEach(it => {
+      if (it.isGiveaway) return;
+      const key = it.productId || it.name;
+      if (!map[key]) map[key] = { name: it.name, revenue: 0, units: 0 };
+      map[key].revenue += it.unitPrice * it.qty;
+      map[key].units += it.qty;
+    }));
+    return Object.values(map);
+  }, [filteredOrders]);
+  const totalRevenueForPct = productAgg.reduce((s, p) => s + p.revenue, 0) || 1;
+  const totalUnitsForPct = productAgg.reduce((s, p) => s + p.units, 0) || 1;
+  const topByRevenue = [...productAgg].sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+  const topByUnits = [...productAgg].sort((a, b) => b.units - a.units).slice(0, 5);
+
+  const spPerf = useMemo(() => salesPeople.map(sp => {
+    const spOrders = filteredOrders.filter(o => o.salesPersonId === sp.id);
+    const revenue = spOrders.reduce((s, o) => s + o.total, 0);
+    const units = spOrders.reduce((s, o) => s + orderUnits(o, false), 0);
+    const byProduct = {};
+    spOrders.forEach(o => o.items.forEach(it => { if (!it.isGiveaway) byProduct[it.name] = (byProduct[it.name] || 0) + it.qty; }));
+    const best = Object.entries(byProduct).sort((a, b) => b[1] - a[1])[0];
+    return { sp, revenue, orders: spOrders.length, units, avgOrder: spOrders.length ? revenue / spOrders.length : 0, bestProduct: best ? best[0] : "—" };
+  }).filter(r => r.orders > 0).sort((a, b) => b.revenue - a.revenue), [filteredOrders, salesPeople]);
+
+  const paymentAgg = useMemo(() => {
+    const map = {};
+    filteredOrders.forEach(o => { if (!map[o.paymentMethod]) map[o.paymentMethod] = { name: o.paymentMethod, revenue: 0, orders: 0 }; map[o.paymentMethod].revenue += o.total; map[o.paymentMethod].orders += 1; });
+    const total = Object.values(map).reduce((s, m) => s + m.revenue, 0) || 1;
+    return Object.values(map).map((m, i) => ({ ...m, pct: (m.revenue / total) * 100, color: CHART_PALETTE[i % CHART_PALETTE.length] })).sort((a, b) => b.revenue - a.revenue);
+  }, [filteredOrders]);
+
+  const promoAgg = useMemo(() => {
+    const map = {}; const orderSets = {};
+    filteredOrders.forEach(o => o.items.forEach(it => {
+      if (it.isGiveaway || !it.priceLabel || it.priceLabel === "RRP") return;
+      const product = products.find(p => p.id === it.productId);
+      const rrp = product?.rrpPrice ?? it.unitPrice;
+      if (!map[it.priceLabel]) map[it.priceLabel] = { name: it.priceLabel, revenue: 0, units: 0, discountSum: 0, discountCount: 0 };
+      map[it.priceLabel].revenue += it.unitPrice * it.qty;
+      map[it.priceLabel].units += it.qty;
+      map[it.priceLabel].discountSum += Math.max(0, rrp - it.unitPrice);
+      map[it.priceLabel].discountCount += 1;
+      orderSets[it.priceLabel] = orderSets[it.priceLabel] || new Set();
+      orderSets[it.priceLabel].add(o.id);
+    }));
+    return Object.values(map).map(m => ({ ...m, orders: orderSets[m.name] ? orderSets[m.name].size : 0, avgDiscount: m.discountCount ? m.discountSum / m.discountCount : 0 })).sort((a, b) => b.revenue - a.revenue);
+  }, [filteredOrders, products]);
+
+  const lowStockProducts = useMemo(() => products
+    .filter(p => availableStock(p) <= LOW_STOCK_THRESHOLD)
+    .map(p => ({ product: p, avail: availableStock(p), allocated: allocatedEventStock(p), reorder: Math.max(LOW_STOCK_THRESHOLD * 2 - availableStock(p), LOW_STOCK_THRESHOLD) }))
+    .sort((a, b) => a.avail - b.avail).slice(0, 50), [products]);
+
+  const recentOrders = useMemo(() => [...filteredOrders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 20), [filteredOrders]);
+
+  function buildReportRows(type) {
+    switch (type) {
+      case "sales": return filteredOrders.map(o => ({ "Order #": o.orderNumber, Date: formatDateTime(o.createdAt), Event: o.eventName, "Sales Person": o.salesPersonName, "Payment Method": o.paymentMethod, Subtotal: o.subtotal, Discount: o.discount, Total: o.total, Status: o.status }));
+      case "event": return salesByEvent.map(r => ({ Event: r.event.name, Revenue: r.revenue, Orders: r.orders, "Units Sold": r.unitsSold, "Avg Order Value": Math.round(r.avgOrderValue), "Growth %": r.growthPct.toFixed(1) }));
+      case "salesperson": return spPerf.map(r => ({ "Sales Person": r.sp.name, Position: r.sp.position, Revenue: r.revenue, Orders: r.orders, "Units Sold": r.units, "Avg Order": Math.round(r.avgOrder), "Best Product": r.bestProduct }));
+      case "payment": return paymentAgg.map(r => ({ "Payment Method": r.name, Revenue: r.revenue, Orders: r.orders, "% of Revenue": r.pct.toFixed(1) }));
+      case "promotion": return promoAgg.map(r => ({ Promotion: r.name, Revenue: r.revenue, Orders: r.orders, "Units Sold": r.units, "Avg Discount": Math.round(r.avgDiscount) }));
+      case "bestselling": return [...productAgg].sort((a, b) => b.revenue - a.revenue).map(r => ({ Product: r.name, Revenue: r.revenue, "Units Sold": r.units }));
+      default: return [];
+    }
+  }
+  function exportReport(type, format) {
+    const rows = buildReportRows(type);
+    const stamp = new Date().toISOString().slice(0, 10);
+    if (!rows.length) return;
+    if (format === "csv") { const csv = Papa.unparse(rows); const blob = new Blob([csv], { type: "text/csv" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `${type}-report-${stamp}.csv`; a.click(); }
+    else if (format === "xlsx") { const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Report"); XLSX.writeFile(wb, `${type}-report-${stamp}.xlsx`); }
+    else if (format === "pdf") { const doc = new window.jspdf.jsPDF({ orientation: "landscape" }); const head = [Object.keys(rows[0])]; const body = rows.map(r => Object.values(r)); doc.autoTable({ head, body, styles: { fontSize: 7 }, headStyles: { fillColor: [34, 112, 88] } }); doc.save(`${type}-report-${stamp}.pdf`); }
+  }
+
+  const eventOptions = events.map(e => ({ id: e.id, label: e.name }));
+  const REPORT_TYPES = [["sales", "Sales Report"], ["event", "Event Report"], ["salesperson", "Sales Person Report"], ["payment", "Payment Report"], ["promotion", "Promotion Report"], ["bestselling", "Best Selling Products"]];
+
+  return (
+    <div className="px-6 py-5 max-w-[1600px] mx-auto">
+      {/* filters */}
+      <div className="bg-white border border-gray-200 rounded-lg p-3 mb-4 flex flex-wrap items-center gap-2">
+        {DATE_PRESET_OPTIONS.map(p => (
+          <button key={p.key} onClick={() => setPreset(p.key)} className={classNames("px-2.5 py-1.5 rounded-md text-xs font-medium border", preset === p.key ? "bg-brand-700 border-brand-700 text-white" : "border-gray-300 text-gray-600 hover:bg-gray-50")}>{p.label}</button>
+        ))}
+        {preset === "custom" && (
+          <>
+            <input type="date" className="text-xs border border-gray-300 rounded px-2 py-1.5" value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
+            <span className="text-xs text-gray-400">to</span>
+            <input type="date" className="text-xs border border-gray-300 rounded px-2 py-1.5" value={customTo} onChange={e => setCustomTo(e.target.value)} />
+          </>
+        )}
+        <div className="w-px h-6 bg-gray-200 mx-1" />
+        <MultiSelectDropdown label="Events" options={eventOptions} selected={eventFilter} onChange={setEventFilter} />
+        <select className="text-xs border border-gray-300 rounded-md px-2.5 py-2" value={salesPersonFilter} onChange={e => setSalesPersonFilter(e.target.value)}>
+          <option value="all">All Sales People</option>
+          {salesPeople.map(sp => <option key={sp.id} value={sp.id}>{sp.name}</option>)}
+        </select>
+        <select className="text-xs border border-gray-300 rounded-md px-2.5 py-2" value={paymentFilter} onChange={e => setPaymentFilter(e.target.value)}>
+          <option value="all">All Payment Methods</option>
+          {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
+        </select>
+      </div>
+
+      {/* KPI cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-5">
+        {[
+          ["Total Sales", formatCurrency(kpi.netRevenue)], ["Total Orders", kpi.totalOrders.toLocaleString()],
+          ["Units Sold", kpi.unitsSold.toLocaleString()], ["Avg Order Value", formatCurrency(Math.round(kpi.avgOrderValue))],
+          ["Total Giveaways", kpi.giveaways.toLocaleString()], ["Gross Revenue", formatCurrency(kpi.grossRevenue)],
+          ["Net Revenue", formatCurrency(kpi.netRevenue)], ["Inventory Value", formatCurrency(Math.round(kpi.inventoryValue))],
+        ].map(([label, val]) => (
+          <div key={label} className="bg-white border border-gray-200 rounded-lg p-3">
+            <div className="text-[10px] text-gray-500 mb-1">{label}</div>
+            <div className="text-base font-semibold text-gray-900">{val}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* sales trend */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-900">Sales Over Time</h3>
+          <div className="flex gap-1 bg-gray-100 rounded-md p-1">
+            {GROUPING_OPTIONS.map(([g, label]) => (
+              <button key={g} onClick={() => setGrouping(g)} className={classNames("px-2 py-1 rounded text-[11px] font-medium", grouping === g ? "bg-white text-brand-800 shadow-sm" : "text-gray-500 hover:text-gray-700")}>{label}</button>
+            ))}
+          </div>
+        </div>
+        <LineChartSVG data={trendData} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Sales by Event</h3>
+          <BarListChart data={salesByEvent.map(r => ({ label: r.event.name, value: r.revenue }))} />
+          <table className="w-full text-xs mt-4">
+            <thead className="text-gray-400 text-left border-b border-gray-100"><tr><th className="py-1">Event</th><th className="py-1">Orders</th><th className="py-1">Units</th><th className="py-1">Avg Order</th><th className="py-1">Growth</th></tr></thead>
+            <tbody>
+              {salesByEvent.map(r => (
+                <tr key={r.event.id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer" onClick={() => setDetailEvent(r.event)}>
+                  <td className="py-1.5 font-medium text-gray-800">{r.event.name}</td>
+                  <td className="py-1.5">{r.orders}</td>
+                  <td className="py-1.5">{r.unitsSold}</td>
+                  <td className="py-1.5">{formatCurrency(Math.round(r.avgOrderValue))}</td>
+                  <td className={classNames("py-1.5 font-medium", r.growthPct >= 0 ? "text-green-600" : "text-red-500")}>{r.growthPct >= 0 ? "+" : ""}{r.growthPct.toFixed(0)}%</td>
+                </tr>
+              ))}
+              {salesByEvent.length === 0 && <tr><td colSpan={5} className="py-6 text-center text-gray-400">No data.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Payment Method Analytics</h3>
+          <div className="flex items-center gap-6">
+            <DonutChart data={paymentAgg.map(p => ({ value: p.revenue, color: p.color }))} />
+            <div className="flex-1 space-y-1.5">
+              {paymentAgg.map(p => (
+                <div key={p.name} className="flex items-center gap-2 text-xs">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+                  <span className="flex-1 text-gray-600 truncate">{p.name}</span>
+                  <span className="text-gray-800 font-medium">{p.pct.toFixed(0)}%</span>
+                </div>
+              ))}
+              {paymentAgg.length === 0 && <p className="text-xs text-gray-400">No data.</p>}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Top 5 Best Selling Products (by Revenue)</h3>
+          <BarListChart data={topByRevenue.map(p => ({ label: p.name, value: p.revenue }))} />
+          <table className="w-full text-xs mt-3">
+            <tbody>
+              {topByRevenue.map((p, i) => (
+                <tr key={p.name} className="border-t border-gray-50"><td className="py-1 text-gray-400 w-6">#{i + 1}</td><td className="py-1 text-gray-700">{p.name}</td><td className="py-1 text-right text-gray-500">{p.units} units</td><td className="py-1 text-right text-gray-400 w-12">{((p.revenue / totalRevenueForPct) * 100).toFixed(0)}%</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Top 5 Best Selling Products (by Units)</h3>
+          <BarListChart data={topByUnits.map(p => ({ label: p.name, value: p.units }))} valueFormatter={v => v.toLocaleString() + " u"} color="#2563eb" />
+          <table className="w-full text-xs mt-3">
+            <tbody>
+              {topByUnits.map((p, i) => (
+                <tr key={p.name} className="border-t border-gray-50"><td className="py-1 text-gray-400 w-6">#{i + 1}</td><td className="py-1 text-gray-700">{p.name}</td><td className="py-1 text-right text-gray-500">{formatCurrency(p.revenue)}</td><td className="py-1 text-right text-gray-400 w-12">{((p.units / totalUnitsForPct) * 100).toFixed(0)}%</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+        <h3 className="text-sm font-semibold text-gray-900 mb-3">Sales Person Performance</h3>
+        <table className="w-full text-xs">
+          <thead className="text-gray-400 text-left border-b border-gray-100"><tr><th className="py-1.5">Sales Person</th><th className="py-1.5">Revenue</th><th className="py-1.5">Orders</th><th className="py-1.5">Units Sold</th><th className="py-1.5">Avg Order</th><th className="py-1.5">Best Product</th></tr></thead>
+          <tbody>
+            {spPerf.map((r, i) => (
+              <tr key={r.sp.id} className="border-b border-gray-50">
+                <td className="py-1.5 font-medium text-gray-800">{i === 0 && <span className="mr-1">🏆</span>}{r.sp.name}</td>
+                <td className="py-1.5">{formatCurrency(r.revenue)}</td>
+                <td className="py-1.5">{r.orders}</td>
+                <td className="py-1.5">{r.units}</td>
+                <td className="py-1.5">{formatCurrency(Math.round(r.avgOrder))}</td>
+                <td className="py-1.5 text-gray-500 truncate max-w-[160px]">{r.bestProduct}</td>
+              </tr>
+            ))}
+            {spPerf.length === 0 && <tr><td colSpan={6} className="py-6 text-center text-gray-400">No data.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Promotion Analytics {promoAgg[0] && <span className="text-xs font-normal text-gray-400">· Most used: {promoAgg[0].name}</span>}</h3>
+          <table className="w-full text-xs">
+            <thead className="text-gray-400 text-left border-b border-gray-100"><tr><th className="py-1.5">Promotion</th><th className="py-1.5">Revenue</th><th className="py-1.5">Orders</th><th className="py-1.5">Units</th><th className="py-1.5">Avg Discount</th></tr></thead>
+            <tbody>
+              {promoAgg.map(r => (
+                <tr key={r.name} className="border-b border-gray-50"><td className="py-1.5 font-medium text-gray-800">{r.name}</td><td className="py-1.5">{formatCurrency(r.revenue)}</td><td className="py-1.5">{r.orders}</td><td className="py-1.5">{r.units}</td><td className="py-1.5">{formatCurrency(Math.round(r.avgDiscount))}</td></tr>
+              ))}
+              {promoAgg.length === 0 && <tr><td colSpan={5} className="py-6 text-center text-gray-400">No promotion usage in this period.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Low Stock Alert</h3>
+          <table className="w-full text-xs">
+            <thead className="text-gray-400 text-left border-b border-gray-100"><tr><th className="py-1.5">Product</th><th className="py-1.5">Available</th><th className="py-1.5">Allocated</th><th className="py-1.5">Reorder Qty</th></tr></thead>
+            <tbody>
+              {lowStockProducts.map(r => (
+                <tr key={r.product.id} className="border-b border-gray-50"><td className="py-1.5 text-gray-800">{r.product.name}</td><td className="py-1.5"><Badge color={r.avail <= 0 ? "red" : "amber"}>{r.avail}</Badge></td><td className="py-1.5">{r.allocated}</td><td className="py-1.5 font-medium">{r.reorder}</td></tr>
+              ))}
+              {lowStockProducts.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-gray-400">No products below threshold ({LOW_STOCK_THRESHOLD}).</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+        <h3 className="text-sm font-semibold text-gray-900 mb-3">Recent Orders</h3>
+        <table className="w-full text-xs">
+          <thead className="text-gray-400 text-left border-b border-gray-100"><tr><th className="py-1.5">Time</th><th className="py-1.5">Order #</th><th className="py-1.5">Sales Person</th><th className="py-1.5">Event</th><th className="py-1.5">Total</th><th className="py-1.5">Payment</th><th className="py-1.5">Status</th></tr></thead>
+          <tbody>
+            {recentOrders.map(o => (
+              <tr key={o.id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer" onClick={() => setDetailOrder(o)}>
+                <td className="py-1.5 text-gray-500 whitespace-nowrap">{formatDateTime(o.createdAt)}</td>
+                <td className="py-1.5 font-mono">{o.orderNumber}</td>
+                <td className="py-1.5">{o.salesPersonName}</td>
+                <td className="py-1.5">{o.eventName}</td>
+                <td className="py-1.5 font-medium">{formatCurrency(o.total)}</td>
+                <td className="py-1.5">{o.paymentMethod}</td>
+                <td className="py-1.5"><Badge color="green">{o.status}</Badge></td>
+              </tr>
+            ))}
+            {recentOrders.length === 0 && <tr><td colSpan={7} className="py-6 text-center text-gray-400">No orders in this period.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <h3 className="text-sm font-semibold text-gray-900 mb-3">Export Reports <span className="text-xs font-normal text-gray-400">— respects the filters above</span></h3>
+        <div className="space-y-2">
+          {REPORT_TYPES.map(([type, label]) => (
+            <div key={type} className="flex items-center justify-between text-sm border border-gray-100 rounded-md px-3 py-2">
+              <span className="text-gray-700">{label}</span>
+              <div className="flex gap-1.5">
+                {["xlsx", "csv", "pdf"].map(fmt => (
+                  <button key={fmt} onClick={() => exportReport(type, fmt)} className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 uppercase text-gray-600">{fmt}</button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <EventDetailModal event={detailEvent} orders={orders} onClose={() => setDetailEvent(null)} />
+      <OrderDetailModal order={detailOrder} onClose={() => setDetailOrder(null)} allowDuplicate={false}
+        onRefund={refundOrder} onCancelDraft={cancelDraft}
+        onEdit={o => { setDetailOrder(null); setEditOrderTarget(o); }}
+        onDelete={o => { setDetailOrder(null); setDeleteOrderTargets([o]); }} />
+      <EditOrderModal order={editOrderTarget} events={events} salesPeople={salesPeople} paymentMethods={paymentMethods} onSave={saveOrderEdit} onClose={() => setEditOrderTarget(null)} />
+      <DeleteOrderDialog ordersToDelete={deleteOrderTargets} onClose={() => setDeleteOrderTargets(null)} onConfirm={restock => deleteOrders(deleteOrderTargets.map(o => o.id), restock)} />
+      <Toast toasts={toasts} />
+    </div>
+  );
+}
+
+/* =========================================================================
+   SETTINGS VIEW — manage Events / Sales People / Payment Methods
+   ========================================================================= */
+function EventForm({ initial, onSave, onCancel }) {
+  const isEdit = initial && initial.id;
+  const [form, setForm] = useState(() => isEdit ? { name: initial.name, date: (initial.date || "").slice(0, 10), location: initial.location || "" } : { name: "", date: new Date().toISOString().slice(0, 10), location: "" });
+  const [error, setError] = useState("");
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
+  function submit() {
+    if (!form.name.trim()) { setError("Event name is required."); return; }
+    onSave({ name: form.name.trim(), date: form.date ? new Date(form.date).toISOString() : new Date().toISOString(), location: form.location.trim() });
+  }
+  return (
+    <div>
+      <Field label="Event Name *"><input className={inputCls} value={form.name} onChange={e => set("name", e.target.value)} autoFocus /></Field>
+      <Field label="Date"><input type="date" className={inputCls} value={form.date} onChange={e => set("date", e.target.value)} /></Field>
+      <Field label="Location"><input className={inputCls} value={form.location} onChange={e => set("location", e.target.value)} placeholder="e.g. Bangkok" /></Field>
+      {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
+      <div className="flex justify-end gap-2 pt-2"><Button variant="outline" onClick={onCancel}>Cancel</Button><Button onClick={submit}>{isEdit ? "Save Changes" : "Add Event"}</Button></div>
+    </div>
+  );
+}
+function SalesPersonForm({ initial, onSave, onCancel }) {
+  const isEdit = initial && initial.id;
+  const [form, setForm] = useState(() => isEdit ? { name: initial.name, position: initial.position } : { name: "", position: "" });
+  const [error, setError] = useState("");
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
+  function submit() {
+    if (!form.name.trim()) { setError("Name is required."); return; }
+    onSave({ name: form.name.trim(), position: form.position.trim() || "Sales Associate" });
+  }
+  return (
+    <div>
+      <Field label="Name *"><input className={inputCls} value={form.name} onChange={e => set("name", e.target.value)} autoFocus /></Field>
+      <Field label="Position"><input className={inputCls} value={form.position} onChange={e => set("position", e.target.value)} placeholder="e.g. Sales Associate" /></Field>
+      {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
+      <div className="flex justify-end gap-2 pt-2"><Button variant="outline" onClick={onCancel}>Cancel</Button><Button onClick={submit}>{isEdit ? "Save Changes" : "Add Sales Person"}</Button></div>
+    </div>
+  );
+}
+function PaymentMethodForm({ initial, onSave, onCancel }) {
+  const isEdit = initial && initial.id;
+  const [name, setName] = useState(isEdit ? initial.name : "");
+  const [error, setError] = useState("");
+  function submit() {
+    if (!name.trim()) { setError("Method name is required."); return; }
+    onSave({ name: name.trim() });
+  }
+  return (
+    <div>
+      <Field label="Method Name *"><input className={inputCls} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Alipay" autoFocus /></Field>
+      {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
+      <div className="flex justify-end gap-2 pt-2"><Button variant="outline" onClick={onCancel}>Cancel</Button><Button onClick={submit}>{isEdit ? "Save Changes" : "Add Method"}</Button></div>
+    </div>
+  );
+}
+
+function SettingsView({ events, setEvents, salesPeople, setSalesPeople, paymentMethods, setPaymentMethods, orders }) {
+  const [subTab, setSubTab] = useState("events");
+  const [editEvent, setEditEvent] = useState(null);
+  const [editSP, setEditSP] = useState(null);
+  const [editPM, setEditPM] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null); // { type, id, name, usage }
+  const [toasts, setToasts] = useState([]);
+  function pushToast(message) {
+    const id = genId("t");
+    setToasts(t => [...t, { id, message }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 2600);
+  }
+
+  function usageCount(type, id) {
+    if (type === "event") return orders.filter(o => o.eventId === id).length;
+    if (type === "salesperson") return orders.filter(o => o.salesPersonId === id).length;
+    if (type === "payment") return orders.filter(o => o.paymentMethodId === id).length;
+    return 0;
+  }
+
+  function saveEvent(data) {
+    if (editEvent && editEvent.id) { setEvents(es => es.map(e => e.id === editEvent.id ? { ...e, ...data } : e)); pushToast("Event updated"); }
+    else { setEvents(es => [...es, { id: genId("ev"), ...data }]); pushToast("Event created"); }
+    setEditEvent(null);
+  }
+  function saveSP(data) {
+    if (editSP && editSP.id) { setSalesPeople(sp => sp.map(s => s.id === editSP.id ? { ...s, ...data } : s)); pushToast("Sales person updated"); }
+    else { setSalesPeople(sp => [...sp, { id: genId("sp"), ...data }]); pushToast("Sales person added"); }
+    setEditSP(null);
+  }
+  function savePM(data) {
+    if (editPM && editPM.id) { setPaymentMethods(pm => pm.map(p => p.id === editPM.id ? { ...p, ...data } : p)); pushToast("Payment method updated"); }
+    else { setPaymentMethods(pm => [...pm, { id: genId("pm"), builtIn: false, ...data }]); pushToast("Payment method added"); }
+    setEditPM(null);
+  }
+  function confirmDeleteAction() {
+    const { type, id } = confirmDelete;
+    if (type === "event") setEvents(es => es.filter(e => e.id !== id));
+    else if (type === "salesperson") setSalesPeople(sp => sp.filter(s => s.id !== id));
+    else if (type === "payment") setPaymentMethods(pm => pm.filter(p => p.id !== id));
+    pushToast("Deleted");
+    setConfirmDelete(null);
+  }
+
+  const SUB_TABS = [["events", "Events"], ["salespeople", "Sales People"], ["payments", "Payment Methods"]];
+
+  return (
+    <div className="px-6 py-5 max-w-[1000px] mx-auto">
+      <div className="flex items-center gap-1 bg-gray-100 rounded-md p-1 mb-4 w-fit">
+        {SUB_TABS.map(([k, label]) => (
+          <button key={k} onClick={() => setSubTab(k)} className={classNames("px-3.5 py-1.5 rounded text-sm font-medium", subTab === k ? "bg-white text-brand-800 shadow-sm" : "text-gray-500 hover:text-gray-700")}>{label}</button>
+        ))}
+      </div>
+
+      {subTab === "events" && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-900">Events</h3>
+            <Button size="sm" onClick={() => setEditEvent({})}><Icon name="plus" className="w-3.5 h-3.5" />Add Event</Button>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="text-gray-400 text-left border-b border-gray-100 text-xs"><tr><th className="py-1.5">Name</th><th className="py-1.5">Date</th><th className="py-1.5">Location</th><th className="py-1.5">Orders</th><th className="py-1.5 text-right">Actions</th></tr></thead>
+            <tbody>
+              {events.map(ev => (
+                <tr key={ev.id} className="border-b border-gray-50">
+                  <td className="py-2 font-medium text-gray-800">{ev.name}</td>
+                  <td className="py-2 text-gray-500">{formatDate(ev.date)}</td>
+                  <td className="py-2 text-gray-500">{ev.location || "—"}</td>
+                  <td className="py-2 text-gray-500">{usageCount("event", ev.id)}</td>
+                  <td className="py-2 text-right">
+                    <button onClick={() => setEditEvent(ev)} className="p-1.5 rounded hover:bg-gray-100 text-gray-500"><Icon name="edit" className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => setConfirmDelete({ type: "event", id: ev.id, name: ev.name, usage: usageCount("event", ev.id) })} className="p-1.5 rounded hover:bg-red-50 text-red-500"><Icon name="trash" className="w-3.5 h-3.5" /></button>
+                  </td>
+                </tr>
+              ))}
+              {events.length === 0 && <tr><td colSpan={5} className="py-8 text-center text-gray-400">No events yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {subTab === "salespeople" && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-900">Sales People</h3>
+            <Button size="sm" onClick={() => setEditSP({})}><Icon name="plus" className="w-3.5 h-3.5" />Add Sales Person</Button>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="text-gray-400 text-left border-b border-gray-100 text-xs"><tr><th className="py-1.5">Name</th><th className="py-1.5">Position</th><th className="py-1.5">Orders</th><th className="py-1.5 text-right">Actions</th></tr></thead>
+            <tbody>
+              {salesPeople.map(sp => (
+                <tr key={sp.id} className="border-b border-gray-50">
+                  <td className="py-2 font-medium text-gray-800">{sp.name}</td>
+                  <td className="py-2 text-gray-500">{sp.position}</td>
+                  <td className="py-2 text-gray-500">{usageCount("salesperson", sp.id)}</td>
+                  <td className="py-2 text-right">
+                    <button onClick={() => setEditSP(sp)} className="p-1.5 rounded hover:bg-gray-100 text-gray-500"><Icon name="edit" className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => setConfirmDelete({ type: "salesperson", id: sp.id, name: sp.name, usage: usageCount("salesperson", sp.id) })} className="p-1.5 rounded hover:bg-red-50 text-red-500"><Icon name="trash" className="w-3.5 h-3.5" /></button>
+                  </td>
+                </tr>
+              ))}
+              {salesPeople.length === 0 && <tr><td colSpan={4} className="py-8 text-center text-gray-400">No sales people yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {subTab === "payments" && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-900">Payment Methods</h3>
+            <Button size="sm" onClick={() => setEditPM({})}><Icon name="plus" className="w-3.5 h-3.5" />Add Method</Button>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="text-gray-400 text-left border-b border-gray-100 text-xs"><tr><th className="py-1.5">Name</th><th className="py-1.5">Orders</th><th className="py-1.5 text-right">Actions</th></tr></thead>
+            <tbody>
+              {paymentMethods.map(pm => (
+                <tr key={pm.id} className="border-b border-gray-50">
+                  <td className="py-2 font-medium text-gray-800">{pm.name} {pm.builtIn && <Badge color="gray">default</Badge>}</td>
+                  <td className="py-2 text-gray-500">{usageCount("payment", pm.id)}</td>
+                  <td className="py-2 text-right">
+                    <button onClick={() => setEditPM(pm)} className="p-1.5 rounded hover:bg-gray-100 text-gray-500"><Icon name="edit" className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => setConfirmDelete({ type: "payment", id: pm.id, name: pm.name, usage: usageCount("payment", pm.id) })} className="p-1.5 rounded hover:bg-red-50 text-red-500"><Icon name="trash" className="w-3.5 h-3.5" /></button>
+                  </td>
+                </tr>
+              ))}
+              {paymentMethods.length === 0 && <tr><td colSpan={3} className="py-8 text-center text-gray-400">No payment methods yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <Modal open={!!editEvent} onClose={() => setEditEvent(null)} title={editEvent && editEvent.id ? "Edit Event" : "Add Event"} width="max-w-md">
+        <EventForm initial={editEvent} onSave={saveEvent} onCancel={() => setEditEvent(null)} />
+      </Modal>
+      <Modal open={!!editSP} onClose={() => setEditSP(null)} title={editSP && editSP.id ? "Edit Sales Person" : "Add Sales Person"} width="max-w-md">
+        <SalesPersonForm initial={editSP} onSave={saveSP} onCancel={() => setEditSP(null)} />
+      </Modal>
+      <Modal open={!!editPM} onClose={() => setEditPM(null)} title={editPM && editPM.id ? "Edit Payment Method" : "Add Payment Method"} width="max-w-sm">
+        <PaymentMethodForm initial={editPM} onSave={savePM} onCancel={() => setEditPM(null)} />
+      </Modal>
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title={`Delete ${confirmDelete?.name || ""}`}
+        danger
+        confirmLabel="Delete"
+        message={`This will permanently remove "${confirmDelete?.name}" from the list.${confirmDelete?.usage ? ` It is referenced by ${confirmDelete.usage} existing order(s) — those orders keep their historical record and are not affected.` : ""}`}
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={confirmDeleteAction}
+      />
+      <Toast toasts={toasts} />
+    </div>
+  );
+}
+
+/* =========================================================================
+   TOP NAV (shared shell across Inventory / POS / Dashboard)
+   ========================================================================= */
+const NAV_TABS = [
+  { key: "inventory", label: "Inventory", icon: "box" },
+  { key: "pos", label: "POS", icon: "package" },
+  { key: "dashboard", label: "Dashboard", icon: "filter" },
+  { key: "settings", label: "Settings", icon: "user" },
+];
+function TopNav({ tab, setTab, currentUser, onLogout }) {
+  return (
+    <div className="sticky top-0 z-30 bg-white border-b border-gray-200">
+      <div className="px-6 h-14 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="w-8 h-8 rounded-md bg-brand-700 flex items-center justify-center text-white"><Icon name="box" className="w-4.5 h-4.5" /></div>
+          <div className="hidden md:block">
+            <div className="text-sm font-semibold text-gray-900 leading-tight">Powerlife</div>
+            <div className="text-[11px] text-gray-400 leading-tight">Event POS System</div>
+          </div>
+        </div>
+        <nav className="flex items-center gap-1 bg-gray-100 rounded-md p-1">
+          {NAV_TABS.map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              className={classNames("px-3.5 py-1.5 rounded text-sm font-medium transition-colors", tab === t.key ? "bg-white text-brand-800 shadow-sm" : "text-gray-500 hover:text-gray-700")}>
+              {t.label}
+            </button>
+          ))}
+        </nav>
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="text-right leading-tight hidden sm:block">
+            <div className="text-xs font-medium text-gray-800">{currentUser.name}</div>
+            <div className="text-[11px] text-gray-400">{currentUser.role}</div>
+          </div>
+          <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-500"><Icon name="user" className="w-4 h-4" /></div>
+          <button onClick={onLogout} className="p-2 rounded hover:bg-gray-100 text-gray-500" title="Sign out"><Icon name="logout" className="w-4 h-4" /></button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================================
+   MAIN APP (owns all shared state: products, events, sales people, payment
+   methods, orders — Inventory / POS / Dashboard are just different views
+   over this same data, per requirement that everything lives in one app).
+   ========================================================================= */
+function MainApp({ currentUser, onLogout }) {
+  const [tab, setTab] = useState("inventory");
+
+  // Generate each seed list exactly once via refs, then reuse the SAME
+  // instances for both the live state and the historical order generator —
+  // otherwise seeded orders would reference orphaned ids from a separate
+  // generation call, silently breaking id-based filters.
+  const eventsRef = useRef(generateSeedEvents());
+  const salesPeopleRef = useRef(generateSeedSalesPeople());
+  const paymentMethodsRef = useRef(generateSeedPaymentMethods());
+  const [events, setEvents] = useState(eventsRef.current);
+  const [products, setProducts] = useState(() => generateSeedProducts(eventsRef.current, 3000));
+  const [salesPeople, setSalesPeople] = useState(salesPeopleRef.current);
+  const [paymentMethods, setPaymentMethods] = useState(paymentMethodsRef.current);
+  const [orders, setOrders] = useState(() => generateSeedOrders(products, eventsRef.current, salesPeopleRef.current, paymentMethodsRef.current));
+
+  return (
+    <div className="min-h-screen">
+      <TopNav tab={tab} setTab={setTab} currentUser={currentUser} onLogout={onLogout} />
+      {tab === "inventory" && (
+        <InventoryView currentUser={currentUser} products={products} setProducts={setProducts} events={events} />
+      )}
+      {tab === "pos" && (
+        <POSView currentUser={currentUser} products={products} setProducts={setProducts} events={events}
+          salesPeople={salesPeople} paymentMethods={paymentMethods} setPaymentMethods={setPaymentMethods}
+          orders={orders} setOrders={setOrders} />
+      )}
+      {tab === "dashboard" && (
+        <DashboardView currentUser={currentUser} products={products} setProducts={setProducts} events={events} salesPeople={salesPeople}
+          paymentMethods={paymentMethods} orders={orders} setOrders={setOrders} />
+      )}
+      {tab === "settings" && (
+        <SettingsView events={events} setEvents={setEvents} salesPeople={salesPeople} setSalesPeople={setSalesPeople}
+          paymentMethods={paymentMethods} setPaymentMethods={setPaymentMethods} orders={orders} />
+      )}
+    </div>
+  );
+}
+
+/* =========================================================================
+   ROOT
+   ========================================================================= */
+function App() {
+  const [currentUser, setCurrentUser] = useState(null);
+  if (!currentUser) return <LoginScreen onLogin={setCurrentUser} />;
+  return <MainApp currentUser={currentUser} onLogout={() => setCurrentUser(null)} />;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
